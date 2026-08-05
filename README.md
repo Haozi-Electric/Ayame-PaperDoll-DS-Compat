@@ -20,8 +20,8 @@ This is a modified build of Ayame PaperDoll (originally by **LucunJi** / **Happy
 
 | Role | Author                                                                                             |
 |------|----------------------------------------------------------------------------------------------------|
-| Original mod | [LucunJi](https://github.com/LucunJi), [HappyRespawnanchor](https://github.com/HappyRespawnanchor) |
-| DS Compat fork | [HOZ](https://github.com/Haozi-Electric), Deepseek                                                                                  |
+| Original mod | LucunJi, HappyRespawnanchor |
+| DS Compat fork | HOZ, Deepseek                                                                                  |
 
 ## License
 
