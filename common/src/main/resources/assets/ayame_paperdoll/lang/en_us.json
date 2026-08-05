@@ -1,10 +1,10 @@
 {
-  "modmenu.descriptionTranslation.ayame_paperdoll": "Highly configurable PaperDoll mod.\nForked from Extra Player Renderer.",
-  "fml.menu.mods.info.description.ayame_paperdoll": "Highly configurable PaperDoll mod.\nForked from Extra Player Renderer.",
+  "modmenu.descriptionTranslation.ayame_paperdoll": "A fork of Ayame PaperDoll with DragonSurvival compatibility.\nOriginally by LucunJi/HappyRespawnanchor. Fork by HOZ/Deepseek.",
+  "fml.menu.mods.info.description.ayame_paperdoll": "A fork of Ayame PaperDoll with DragonSurvival compatibility.\nOriginally by LucunJi/HappyRespawnanchor. Fork by HOZ/Deepseek.",
   "config.ayame_paperdoll.on": "On",
   "config.ayame_paperdoll.off": "Off",
   "config.ayame_paperdoll.reset": "RESET",
-  "key.ayame_paperdoll.category": "Ayame PaperDoll",
+  "key.ayame_paperdoll.category": "Ayame PaperDoll DS Compat",
   "key.ayame_paperdoll.openConfigGui": "Open Config GUI",
   "key.ayame_paperdoll.showPaperDoll": "Toggle PaperDoll Display",
   "config.ayame_paperdoll.presets.top_left": "Top Left",
