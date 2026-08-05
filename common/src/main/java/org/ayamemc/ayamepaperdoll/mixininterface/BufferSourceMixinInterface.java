@@ -21,6 +21,6 @@
 package org.ayamemc.ayamepaperdoll.mixininterface;
 
 public interface BufferSourceMixinInterface {
-    default void ayame_PaperDoll$setForceDisableCulling(boolean disableCulling) {
+    default void ayame_PaperDoll$setFlipCullFace(boolean flipCullFace) {
     }
 }

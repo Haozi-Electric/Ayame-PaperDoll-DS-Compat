@@ -41,6 +41,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import com.hoz.ayamedscompat.AyameDSCompat;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
 import org.ayamemc.ayamepaperdoll.hud.DataBackup.DataBackupEntry;
@@ -279,14 +280,16 @@ public class PaperDollRenderer {
 
         Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
         modelViewStack.pushMatrix();
-        modelViewStack.scale(mirror ? -1 : 1, 1, -1);
-        // IDK what shit Mojang made but let's add 180 deg to restore the old behavior
+        modelViewStack.scale(1, 1, -1);
         modelViewStack.rotateY((float) Math.toRadians(lightDegree + 180));
-
         RenderSystem.applyModelViewMatrix();
+
         PoseStack poseStack = new PoseStack();
         poseStack.mulPose(Axis.YP.rotationDegrees(-(float) lightDegree - 180));
-        poseStack.translate((mirror ? -1 : 1) * posX, posY, 0);
+        poseStack.translate(posX, posY, 0);
+        // X mirror INNERMOST (closest to model vertex): mirrors raw geometry
+        // coordinates so the model faces the camera instead of away from it.
+        if (mirror) poseStack.scale(-1, 1, 1);
         poseStack.scale((float) size, (float) size, (float) size);
         Quaternionf zRot = new Quaternionf().rotateZ((float) Math.PI);
 
@@ -326,13 +329,25 @@ public class PaperDollRenderer {
         final float rotationYaw = ((rotationMode == RotationMode.UNLOCK) /*|| (rotationMode == RotationMode.SMOOTH_LOCK)*/) ? targetEntity.getYRot() : 0.0F;
 
         // TODO: 修复矿车锁定旋转时不被锁定的问题
+        // The paper doll renders with a GPU modelview Z-inversion, so every
+        // model's front faces end up clockwise in window space and default
+        // culling (keep CCW) would cull them. In mirror mode the CPU X-flip
+        // reflects winding a second time, keeping the front faces clockwise
+        // too — so we flip the cull face (cull CCW, keep CW) to show the
+        // front. Culling stays ENABLED in both modes, which also stops the
+        // paper-thin dragon wings from z-fighting (flickering).
+        // Set the flags BEFORE the render: switching render types mid-render
+        // (dragon body -> glow/armor layers) flushes buffers immediately, so
+        // the cull state must already be active for those draws.
+        bufferSource.ayame_PaperDoll$setFlipCullFace(mirror);
+        AyameDSCompat.pushCompatRendering();
         RenderSystem.runAsFancy(
                 () -> entityRenderDispatcher.render(targetEntity, offset.x, offset.y, offset.z, rotationYaw, partialTicks, poseStack, bufferSource, getLight(targetEntity, partialTicks))
         );
+        AyameDSCompat.popCompatRendering();
 
-        // 事实证明1.21.3+只需一直禁用剔除，镜像也不会导致什么问题
-        bufferSource.ayame_PaperDoll$setForceDisableCulling(true);
         bufferSource.endBatch();
+        bufferSource.ayame_PaperDoll$setFlipCullFace(false);
 
         // do not need to restore this value in fact
         entityRenderDispatcher.setRenderShadow(true);
