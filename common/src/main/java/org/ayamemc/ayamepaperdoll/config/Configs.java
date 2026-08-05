@@ -53,7 +53,7 @@ public class Configs {
     public final SimpleNumericOption<Double> headYawRange = new SimpleNumericOption<>(ROTATIONS_CATEGORY, AyamePaperDoll.path("head_yaw_range"), 0D, 0D, 180D);
     public final SimpleNumericOption<Double> bodyYaw = new SimpleNumericOption<>(ROTATIONS_CATEGORY, AyamePaperDoll.path("body_yaw"), 0D, -180D, 180D);
     public final SimpleNumericOption<Double> bodyYawRange = new SimpleNumericOption<>(ROTATIONS_CATEGORY, AyamePaperDoll.path("body_yaw_range"), 0D, 0D, 180D);
-    public final SimpleOption<PoseOffsetMethod> poseOffsetMethod = new SimpleOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("pose_offset_method"), PoseOffsetMethod.AUTO);
+    public final SimpleOption<PoseOffsetMethod> poseOffsetMethod = new SimpleOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("pose_offset_method"), PoseOffsetMethod.DISABLED);
     public final SimpleNumericOption<Double> sneakOffsetY = new SimpleNumericOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("sneak_offset_y"), -0.35, -3D, 3D);
     public final SimpleNumericOption<Double> swimCrawlOffsetY = new SimpleNumericOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("swim_crawl_offset_y"), -1.22, -3D, 3D);
     public final SimpleNumericOption<Double> elytraOffsetY = new SimpleNumericOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("elytra_offset_y"), -1.22, -3D, 3D);
