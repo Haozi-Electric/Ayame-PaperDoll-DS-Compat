@@ -11,6 +11,8 @@ displayURL = "${mod_homepage_url}"
 authors = '''
 LucunJi(Original author)
 HappyRespawnanchor
+HOZ(DS Compat fork)
+Deepseek(DS Compat fork)
 '''
 credits = '''
 Fallen_Breath
