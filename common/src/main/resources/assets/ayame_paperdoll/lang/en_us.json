@@ -90,5 +90,14 @@
   "config.ayame_paperdoll.option.hide_under_debug.desc": "Hide under F3 debug screen.",
   "config.ayame_paperdoll.option.hide_on_screen_open.desc": "Hide when a screen (e.g., game menu or inventory) is open.",
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "Automatically switch entity model in spectator mode.\n\nOverrides §2Player Name§r option if enabled.",
-  "config.ayame_paperdoll.option.player_name.desc": "The name of the player to render. It will be your name when left blank."
+  "config.ayame_paperdoll.option.player_name.desc": "The name of the player to render. It will be your name when left blank.",
+  "config.ayame_paperdoll.category.debug": "Debug",
+  "config.ayame_paperdoll.option.debug_mode": "Debug Mode",
+  "config.ayame_paperdoll.option.debug_mode.desc": "Master switch for all debug features. No debug output unless enabled.\n\n§cWarning: Enables verbose logging and may impact performance.",
+  "config.ayame_paperdoll.option.debug_log_cull_face": "Log: Cull Face State",
+  "config.ayame_paperdoll.option.debug_log_cull_face.desc": "Log GL cull face changes during paper doll rendering.\nUse to diagnose mirror-mode model flip/disappear issues.",
+  "config.ayame_paperdoll.option.debug_log_render_types": "Log: Render Types",
+  "config.ayame_paperdoll.option.debug_log_render_types.desc": "Log all RenderType instances used during paper doll rendering.\nUse to check which render layers go through endBatch.",
+  "config.ayame_paperdoll.option.debug_force_disable_culling": "Force Disable Culling",
+  "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "Force-disable face culling instead of flipping it in mirror mode.\nIf mirror mode works with this on, the flip-cull logic is being overridden.\n§cWarning: causes DS dragon wing z-fighting. Diagnostic only!"
 }

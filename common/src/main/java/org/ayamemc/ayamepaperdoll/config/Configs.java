@@ -38,6 +38,7 @@ public class Configs {
     public static final ResourceLocation POSTURES_CATEGORY = AyamePaperDoll.path("postures");
     public static final ResourceLocation DETAILS_CATEGORY = AyamePaperDoll.path("details");
     public static final ResourceLocation HIDDEN_CATEGORY = AyamePaperDoll.path("hidden");
+    public static final ResourceLocation DEBUG_CATEGORY = AyamePaperDoll.path("debug");
     public final SimpleOption<Boolean> displayPaperDoll = new SimpleOption<>(GENERAL_CATEGORY, AyamePaperDoll.path("display_paperdoll"), true);
     public final SimpleOption<RotationMode> rotationMode = new SimpleOption<>(GENERAL_CATEGORY, AyamePaperDoll.path("rotation_mode"), RotationMode.LOCK);
     public final SimpleNumericOption<Double> offsetX = new SimpleNumericOption<>(GENERAL_CATEGORY, AyamePaperDoll.path("offset_x"), 0.08, -0.5, 1.5);
@@ -71,6 +72,10 @@ public class Configs {
     public final SimpleOption<Boolean> spectatorAutoSwitch = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("spectator_auto_switch"), true);
     public final SimpleOption<String> playerName = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("player_name"), "");
     public final SimpleOption<Integer> lastConfigTabIdx = new SimpleOption<>(HIDDEN_CATEGORY, AyamePaperDoll.path("last_config_tab_idx"), 0);
+    public final SimpleOption<Boolean> debugMode = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_mode"), false);
+    public final SimpleOption<Boolean> debugLogCullFace = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_log_cull_face"), false);
+    public final SimpleOption<Boolean> debugLogRenderTypes = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_log_render_types"), false);
+    public final SimpleOption<Boolean> debugForceDisableCulling = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_force_disable_culling"), false);
     public final Presets topLeft = new Presets.PresetsBuilder()
             .with(offsetX, 0.08)
             .with(offsetY, 0.23)

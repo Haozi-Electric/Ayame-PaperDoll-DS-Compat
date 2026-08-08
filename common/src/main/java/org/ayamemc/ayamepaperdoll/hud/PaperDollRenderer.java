@@ -32,6 +32,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import org.lwjgl.opengl.GL11;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -42,6 +43,7 @@ import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import com.hoz.ayamedscompat.AyameDSCompat;
+import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
 import org.ayamemc.ayamepaperdoll.hud.DataBackup.DataBackupEntry;
@@ -328,17 +330,43 @@ public class PaperDollRenderer {
 
         final float rotationYaw = ((rotationMode == RotationMode.UNLOCK) /*|| (rotationMode == RotationMode.SMOOTH_LOCK)*/) ? targetEntity.getYRot() : 0.0F;
 
+        if (CONFIGS.debugMode.getValue()) {
+            AyamePaperDoll.LOGGER.info(
+                    "[Debug] performRendering: mirror={} size={} entity={} forceDisableCulling={}",
+                    mirror, size, targetEntity.getClass().getSimpleName(),
+                    CONFIGS.debugForceDisableCulling.getValue());
+        }
+
         // TODO: 修复矿车锁定旋转时不被锁定的问题
-        // The paper doll renders with a GPU modelview Z-inversion, so every
-        // model's front faces end up clockwise in window space and default
-        // culling (keep CCW) would cull them. In mirror mode the CPU X-flip
-        // reflects winding a second time, keeping the front faces clockwise
-        // too — so we flip the cull face (cull CCW, keep CW) to show the
-        // front. Culling stays ENABLED in both modes, which also stops the
-        // paper-thin dragon wings from z-fighting (flickering).
-        // Set the flags BEFORE the render: switching render types mid-render
-        // (dragon body -> glow/armor layers) flushes buffers immediately, so
-        // the cull state must already be active for those draws.
+        // The paper doll's GPU modelview Z-inversion + mirror CPU X-flip
+        // combine to produce clockwise-winding front faces in window space.
+        // Default culling (GL_BACK = keep CCW) would cull them. We flip the
+        // cull face to GL_FRONT in mirror mode to keep those CW front-faces.
+        //
+        // We manage glCullFace GLOBALLY here (not just per-batch via the
+        // BufferSource mixin) because mods like ImmediatelyFast, ModernFix,
+        // or shader frameworks can replace or bypass BufferSource.endBatch().
+        // Global GL state affects all downstream rendering regardless of
+        // which buffer implementation is used.
+        final boolean needCullFix = mirror || (CONFIGS.debugMode.getValue()
+                && CONFIGS.debugForceDisableCulling.getValue());
+
+        if (needCullFix) {
+            if (CONFIGS.debugMode.getValue() && CONFIGS.debugForceDisableCulling.getValue()) {
+                GL11.glDisable(GL11.GL_CULL_FACE);
+                if (CONFIGS.debugLogCullFace.getValue()) {
+                    AyamePaperDoll.LOGGER.info("[Debug] GL direct: glDisable(GL_CULL_FACE) pre-render");
+                }
+            } else if (mirror) {
+                GL11.glCullFace(GL11.GL_FRONT);
+                if (CONFIGS.debugMode.getValue() && CONFIGS.debugLogCullFace.getValue()) {
+                    int cullMode = GL11.glGetInteger(GL11.GL_CULL_FACE_MODE);
+                    AyamePaperDoll.LOGGER.info("[Debug] GL direct: glCullFace(GL_FRONT) pre-render, result=0x{}",
+                            String.format("%X", cullMode));
+                }
+            }
+        }
+
         bufferSource.ayame_PaperDoll$setFlipCullFace(mirror);
         AyameDSCompat.pushCompatRendering();
         RenderSystem.runAsFancy(
@@ -348,6 +376,14 @@ public class PaperDollRenderer {
 
         bufferSource.endBatch();
         bufferSource.ayame_PaperDoll$setFlipCullFace(false);
+
+        if (needCullFix) {
+            GL11.glEnable(GL11.GL_CULL_FACE);
+            GL11.glCullFace(GL11.GL_BACK);
+            if (CONFIGS.debugMode.getValue() && CONFIGS.debugLogCullFace.getValue()) {
+                AyamePaperDoll.LOGGER.info("[Debug] GL direct: restored glEnable+glCullFace(GL_BACK) post-render");
+            }
+        }
 
         // do not need to restore this value in fact
         entityRenderDispatcher.setRenderShadow(true);

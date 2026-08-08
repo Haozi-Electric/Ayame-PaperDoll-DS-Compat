@@ -1,6 +1,6 @@
 {
-  "modmenu.descriptionTranslation.ayame_paperdoll": "高度可配置的纸娃娃模组。\n额外玩家渲染的的分支。",
-  "fml.menu.mods.info.description.ayame_paperdoll": "高度可配置的纸娃娃模组。\n额外玩家渲染的的分支。",
+  "modmenu.descriptionTranslation.ayame_paperdoll": "高度可配置的纸娃娃模组。\n额外玩家渲染的的分支。\n本模组为原Ayame纸娃娃的分支，用于为龙之生存提供兼容性。",
+  "fml.menu.mods.info.description.ayame_paperdoll": "高度可配置的纸娃娃模组。\n额外玩家渲染的的分支。\n本模组为原Ayame纸娃娃的分支，用于为龙之生存提供兼容性。",
   "config.ayame_paperdoll.on": "开",
   "config.ayame_paperdoll.off": "关",
   "config.ayame_paperdoll.reset": "重置",
@@ -90,5 +90,14 @@
   "config.ayame_paperdoll.option.hide_under_debug.desc": "是否在 F3 打开的调试屏幕下隐藏",
   "config.ayame_paperdoll.option.hide_on_screen_open.desc": "是否在屏幕打开（例如游戏菜单或背包）时隐藏",
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "旁观者模式下自动切换实体模型\n\n打开后会覆盖§2渲染玩家名§r的功能",
-  "config.ayame_paperdoll.option.player_name.desc": "被渲染实体的玩家名，空白代表你自己的名称"
+  "config.ayame_paperdoll.option.player_name.desc": "被渲染实体的玩家名，空白代表你自己的名称",
+  "config.ayame_paperdoll.category.debug": "调试",
+  "config.ayame_paperdoll.option.debug_mode": "调试模式",
+  "config.ayame_paperdoll.option.debug_mode.desc": "调试模式总开关。所有调试功能仅在开启时生效。\n\n§c警告：开启后会在日志中输出大量信息，可能影响性能。",
+  "config.ayame_paperdoll.option.debug_log_cull_face": "日志：剔除面状态",
+  "config.ayame_paperdoll.option.debug_log_cull_face.desc": "在纸娃娃渲染时记录 GL 剔除面（cull face）的变更。\n用于诊断镜像模式下模型翻转/消失的问题。",
+  "config.ayame_paperdoll.option.debug_log_render_types": "日志：渲染类型",
+  "config.ayame_paperdoll.option.debug_log_render_types.desc": "在纸娃娃渲染时记录所有用到的 RenderType。\n用于排查哪些渲染层经过了 endBatch。",
+  "config.ayame_paperdoll.option.debug_force_disable_culling": "强制禁用剔除",
+  "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "强制关闭面剔除（替代镜像时的翻转剔除）。\n如果镜像模式在此选项开启后恢复正常，说明翻转剔除逻辑被其他模组覆盖了。\n§c注意：会导致 DS 龙翅膀 z-fighting 闪烁。仅用于诊断！"
 }
