@@ -25,4 +25,4 @@ This is a modified build of Ayame PaperDoll (originally by **LucunJi** / **Happy
 
 ## License
 
-LGPL-3.0-or-later, same as upstream. See [LICENSE](LICENSE).
+LGPL-3.0-or-later, same as upstream. See [LICENSE](licenses/ExtraPlayerRenderer/LICENSE).
