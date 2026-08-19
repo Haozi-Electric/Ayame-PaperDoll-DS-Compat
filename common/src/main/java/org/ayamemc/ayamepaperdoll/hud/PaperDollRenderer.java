@@ -293,6 +293,15 @@ public class PaperDollRenderer {
         // coordinates so the model faces the camera instead of away from it.
         if (mirror) poseStack.scale(-1, 1, 1);
         poseStack.scale((float) size, (float) size, (float) size);
+        // Auto-scale an oversized dragon back to human height so it doesn't overflow the
+        // paper doll. Applied to the local poseStack only; the provider returns 1.0 for
+        // non-dragons, and when the feature is disabled this block is skipped entirely.
+        if (CONFIGS.autoScaleDragonToHumanHeight.getValue()) {
+            float dragonScaleFactor = AyameDSCompat.getDragonScaleFactor(targetEntity);
+            if (dragonScaleFactor != 1.0f) {
+                poseStack.scale(dragonScaleFactor, dragonScaleFactor, dragonScaleFactor);
+            }
+        }
         Quaternionf zRot = new Quaternionf().rotateZ((float) Math.PI);
 
         final RotationMode rotationMode = CONFIGS.rotationMode.getValue();
@@ -337,17 +346,12 @@ public class PaperDollRenderer {
                     CONFIGS.debugForceDisableCulling.getValue());
         }
 
+        // Mirror X-flip reverses triangle winding. Combined with the GPU
+        // Z-inversion, front faces end up CW in window space, which default
+        // culling (GL_BACK) would discard. Flip to GL_FRONT to keep them.
+        // Applied as global GL state so it survives mods that bypass or
+        // replace BufferSource.endBatch (e.g. ImmediatelyFast).
         // TODO: 修复矿车锁定旋转时不被锁定的问题
-        // The paper doll's GPU modelview Z-inversion + mirror CPU X-flip
-        // combine to produce clockwise-winding front faces in window space.
-        // Default culling (GL_BACK = keep CCW) would cull them. We flip the
-        // cull face to GL_FRONT in mirror mode to keep those CW front-faces.
-        //
-        // We manage glCullFace GLOBALLY here (not just per-batch via the
-        // BufferSource mixin) because mods like ImmediatelyFast, ModernFix,
-        // or shader frameworks can replace or bypass BufferSource.endBatch().
-        // Global GL state affects all downstream rendering regardless of
-        // which buffer implementation is used.
         final boolean needCullFix = mirror || (CONFIGS.debugMode.getValue()
                 && CONFIGS.debugForceDisableCulling.getValue());
 

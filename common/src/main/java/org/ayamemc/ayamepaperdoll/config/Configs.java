@@ -37,6 +37,7 @@ public class Configs {
     public static final ResourceLocation ROTATIONS_CATEGORY = AyamePaperDoll.path("rotations");
     public static final ResourceLocation POSTURES_CATEGORY = AyamePaperDoll.path("postures");
     public static final ResourceLocation DETAILS_CATEGORY = AyamePaperDoll.path("details");
+    public static final ResourceLocation DS_COMPAT_CATEGORY = AyamePaperDoll.path("ds_compat");
     public static final ResourceLocation HIDDEN_CATEGORY = AyamePaperDoll.path("hidden");
     public static final ResourceLocation DEBUG_CATEGORY = AyamePaperDoll.path("debug");
     public final SimpleOption<Boolean> displayPaperDoll = new SimpleOption<>(GENERAL_CATEGORY, AyamePaperDoll.path("display_paperdoll"), true);
@@ -71,6 +72,7 @@ public class Configs {
     public final SimpleOption<Boolean> hideOnScreenOpen = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("hide_on_screen_open"), false);
     public final SimpleOption<Boolean> spectatorAutoSwitch = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("spectator_auto_switch"), true);
     public final SimpleOption<String> playerName = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("player_name"), "");
+    public final SimpleOption<Boolean> autoScaleDragonToHumanHeight = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_scale_dragon_to_human_height"), true);
     public final SimpleOption<Integer> lastConfigTabIdx = new SimpleOption<>(HIDDEN_CATEGORY, AyamePaperDoll.path("last_config_tab_idx"), 0);
     public final SimpleOption<Boolean> debugMode = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_mode"), false);
     public final SimpleOption<Boolean> debugLogCullFace = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_log_cull_face"), false);

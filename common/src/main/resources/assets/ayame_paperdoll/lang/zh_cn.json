@@ -92,6 +92,7 @@
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "旁观者模式下自动切换实体模型\n\n打开后会覆盖§2渲染玩家名§r的功能",
   "config.ayame_paperdoll.option.player_name.desc": "被渲染实体的玩家名，空白代表你自己的名称",
   "config.ayame_paperdoll.category.debug": "调试",
+  "config.ayame_paperdoll.category.ds_compat": "龙之生存兼容",
   "config.ayame_paperdoll.option.debug_mode": "调试模式",
   "config.ayame_paperdoll.option.debug_mode.desc": "调试模式总开关。所有调试功能仅在开启时生效。\n\n§c警告：开启后会在日志中输出大量信息，可能影响性能。",
   "config.ayame_paperdoll.option.debug_log_cull_face": "日志：剔除面状态",
@@ -99,5 +100,7 @@
   "config.ayame_paperdoll.option.debug_log_render_types": "日志：渲染类型",
   "config.ayame_paperdoll.option.debug_log_render_types.desc": "在纸娃娃渲染时记录所有用到的 RenderType。\n用于排查哪些渲染层经过了 endBatch。",
   "config.ayame_paperdoll.option.debug_force_disable_culling": "强制禁用剔除",
-  "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "强制关闭面剔除（替代镜像时的翻转剔除）。\n如果镜像模式在此选项开启后恢复正常，说明翻转剔除逻辑被其他模组覆盖了。\n§c注意：会导致 DS 龙翅膀 z-fighting 闪烁。仅用于诊断！"
+  "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "强制关闭面剔除（替代镜像时的翻转剔除）。\n如果镜像模式在此选项开启后恢复正常，说明翻转剔除逻辑被其他模组覆盖了。\n§c注意：会导致 DS 龙翅膀 z-fighting 闪烁。仅用于诊断！",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "自动缩放龙到人类高度",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "将长大超过人类身高的龙模型在纸娃娃中自动缩放到人类高度，避免超出屏幕。仅影响纸娃娃渲染。"
 }

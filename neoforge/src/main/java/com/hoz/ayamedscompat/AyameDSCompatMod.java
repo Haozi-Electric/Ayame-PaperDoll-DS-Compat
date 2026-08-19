@@ -22,6 +22,10 @@
 
 package com.hoz.ayamedscompat;
 
+import by.dragonsurvivalteam.dragonsurvival.client.render.ClientDragonRenderer;
+import by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvider;
+import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
 
@@ -34,5 +38,21 @@ import net.neoforged.fml.common.Mod;
 public final class AyameDSCompatMod {
     public static final String MOD_ID = "ayame_ds_compat";
 
-    public AyameDSCompatMod() {}
+    public AyameDSCompatMod() {
+        // The paper doll's common renderer asks via AyameDSCompat; the provider resolves the
+        // dragon's current visual scale (player SCALE attribute, human = 1.0) and normalizes it
+        // back to human height so oversized dragons don't overflow the paper doll. Non-dragons
+        // and players without a dragon entity yet are left untouched (factor 1.0).
+        AyameDSCompat.setDragonScaleProvider(entity -> {
+            if (!(entity instanceof Player player) || !DragonStateProvider.isDragon(player)) {
+                return 1.0f;
+            }
+            DragonEntity dragon = ClientDragonRenderer.getDragon(player);
+            if (dragon == null) {
+                return 1.0f;
+            }
+            float scale = dragon.getScale();
+            return scale > 0.001f ? 1.0f / scale : 1.0f;
+        });
+    }
 }

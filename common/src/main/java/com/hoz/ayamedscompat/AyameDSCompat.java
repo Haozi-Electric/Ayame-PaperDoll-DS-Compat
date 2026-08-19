@@ -22,6 +22,8 @@
 
 package com.hoz.ayamedscompat;
 
+import net.minecraft.world.entity.Entity;
+
 /**
  * Static depth counter shared across common and neoforge modules.
  * PaperDollRenderer (in common) calls push/pop around entity render;
@@ -30,6 +32,7 @@ package com.hoz.ayamedscompat;
  */
 public final class AyameDSCompat {
     private static int compatRenderingDepth;
+    private static DragonScaleProvider dragonScaleProvider;
 
     private AyameDSCompat() {}
 
@@ -45,5 +48,24 @@ public final class AyameDSCompat {
         if (compatRenderingDepth > 0) {
             compatRenderingDepth--;
         }
+    }
+
+    /**
+     * Registers the neoforge-side provider that computes how much a dragon's
+     * paper doll model must be scaled to reach normal human height. Kept as a
+     * hook so the common PaperDollRenderer never needs a DragonSurvival dependency.
+     */
+    public static void setDragonScaleProvider(DragonScaleProvider provider) {
+        dragonScaleProvider = provider;
+    }
+
+    /** Scale factor (1.0 = unchanged) to apply to the paper doll model of {@code entity}. */
+    public static float getDragonScaleFactor(Entity entity) {
+        return dragonScaleProvider == null ? 1.0f : dragonScaleProvider.getDragonScaleFactor(entity);
+    }
+
+    @FunctionalInterface
+    public interface DragonScaleProvider {
+        float getDragonScaleFactor(Entity entity);
     }
 }

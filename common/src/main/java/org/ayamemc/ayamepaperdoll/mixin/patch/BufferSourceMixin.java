@@ -51,9 +51,6 @@ public abstract class BufferSourceMixin implements BufferSourceMixinInterface {
         }
 
         if (debugMode && forceDisableCulling) {
-            // Diagnostic mode: force-disable culling completely.
-            // If mirror mode renders correctly with this ON, it means
-            // our glCullFace(GL_FRONT) flip is not taking effect at draw time.
             GL11.glDisable(GL11.GL_CULL_FACE);
             if (logCullFace) {
                 boolean cullEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
@@ -65,8 +62,9 @@ public abstract class BufferSourceMixin implements BufferSourceMixinInterface {
             return;
         }
 
-        // Normal mirror fix: flip the cull face so the model's front (CW in
-        // window space after the paper doll's Z-inversion + X-flip) is kept.
+        // Mirror X-flip reverses winding, combined with the paper doll's
+        // GPU Z-inversion front faces end up CW in window space. Default
+        // culling (GL_BACK) would cull them, so flip to GL_FRONT.
         if (logCullFace) {
             boolean cullEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
             int cullMode = GL11.glGetInteger(GL11.GL_CULL_FACE_MODE);
