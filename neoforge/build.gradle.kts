@@ -50,12 +50,23 @@ repositories {
         name = "NeoForged"
         url = uri("https://maven.neoforged.net/releases")
     }
+    maven {
+        name = "GeckoLib"
+        url = uri("https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/")
+    }
 }
 
 dependencies {
     add("neoForge", "net.neoforged:neoforge:${rootProject.extra["neoforge_version"]}")
 
     common(project(path = ":common")) { isTransitive = false }
+
+    // DragonSurvival + GeckoLib for the DS compat hook (client-only, not bundled).
+    // Resolved from the 26.1.2 test client's mods folder; replace with a proper maven
+    // coordinate when a stable one is available.
+    val testClientMods = "D:/Programs/MCPCL2/.minecraft/versions/26.1.2-NeoForge_测试客户端/mods"
+    implementation(fileTree(testClientMods) { include("**/*DragonSurvival*.jar") })
+    compileOnly(fileTree(testClientMods) { include("**/*geckolib*.jar") })
 
     shadowBundle(
         project(

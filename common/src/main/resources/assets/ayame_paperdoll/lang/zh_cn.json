@@ -90,5 +90,10 @@
   "config.ayame_paperdoll.option.hide_under_debug.desc": "是否在 F3 打开的调试屏幕下隐藏",
   "config.ayame_paperdoll.option.hide_on_screen_open.desc": "是否在屏幕打开（例如游戏菜单或背包）时隐藏",
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "旁观者模式下自动切换实体模型\n\n打开后会覆盖§2渲染玩家名§r的功能",
-  "config.ayame_paperdoll.option.player_name.desc": "被渲染实体的玩家名，空白代表你自己的名称"
+  "config.ayame_paperdoll.option.player_name.desc": "被渲染实体的玩家名，空白代表你自己的名称",
+  "config.ayame_paperdoll.category.ds_compat": "龙之生存兼容",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "自动缩放龙到人类高度",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "将长大超过人类身高的龙模型在纸娃娃中自动缩放到人类高度，避免超出屏幕。仅影响纸娃娃渲染。",
+  "config.ayame_paperdoll.option.ds_glide_forward": "滑翔时龙身朝前",
+  "config.ayame_paperdoll.option.ds_glide_forward.desc": "纸娃娃中龙玩家滑翔时保持身体朝前，不左右摆动。"
 }

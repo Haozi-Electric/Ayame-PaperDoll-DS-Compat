@@ -11,6 +11,7 @@ displayURL = "${mod_homepage_url}"
 authors = '''
 LucunJi(Original author)
 HappyRespawnanchor
+HOZ,Deepseek(DS Compat fork)
 '''
 credits = '''
 Fallen_Breath
@@ -23,7 +24,6 @@ LightgraycaAT
 description = '''${mod_description}'''
 logoFile = "icon.png"
 logoBlur = false
-updateJSONURL = "https://api.modrinth.com/updates/ayame-paperdoll/forge_updates.json?neoforge=only"
 [[dependencies.${ mod_id }]]
 modId = "neoforge"
 type = "required"
@@ -38,5 +38,48 @@ versionRange = "${neoforge_minecraft_version_range}"
 ordering = "NONE"
 side = "CLIENT"
 
+[[mods]]
+modId = "ayame_ds_compat"
+version = "${version}"
+displayName = "Ayame PaperDoll - DS Compat"
+authors = '''
+HOZ
+Deepseek
+'''
+license = "LGPL-3.0-or-later"
+description = '''DragonSurvival compatibility layer for Ayame PaperDoll.'''
+logoFile = "icon.png"
+logoBlur = false
+[[dependencies.ayame_ds_compat]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforge_version},)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.ayame_ds_compat]]
+modId = "minecraft"
+type = "required"
+versionRange = "${neoforge_minecraft_version_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.ayame_ds_compat]]
+modId = "dragonsurvival"
+type = "required"
+versionRange = "[2.1.0,)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.ayame_ds_compat]]
+modId = "geckolib"
+type = "required"
+versionRange = "[5.5.2,)"
+ordering = "AFTER"
+side = "CLIENT"
+
 [[mixins]]
 config = "${mod_mixin_config}"
+
+[[mixins]]
+config = "ayame_ds_compat.mixins.json"

@@ -40,6 +40,7 @@ import net.minecraft.client.renderer.Projection;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
+import com.hoz.ayamedscompat.AyameDSCompat;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import org.jetbrains.annotations.NotNull;
@@ -85,8 +86,19 @@ public class ModRenderer extends PictureInPictureRenderer<ModRenderState> {
         }
         Vector3f vector3f = renderState.translation();
         poseStack.mulPose(renderState.rotation());
+        // Mark DS compat rendering (only when the preview target is a dragon) across submit AND
+        // renderAllFeatures: submit only queues the node, the actual bone pass (which reads
+        // Compat.displayNeck for the neck visibility) runs in renderAllFeatures, so the flag must
+        // stay up through that. Normal human paper doll renders never set the flag.
+        boolean dragonTarget = AyameDSCompat.isCompatTargetDragon();
+        if (dragonTarget) {
+            AyameDSCompat.pushCompatRendering();
+        }
         this.entityRenderDispatcher.submit(renderState.renderState(), camerarenderstate, vector3f.x, vector3f.y, vector3f.z, poseStack, featurerenderdispatcher.getSubmitNodeStorage());
         featurerenderdispatcher.renderAllFeatures();
+        if (dragonTarget) {
+            AyameDSCompat.popCompatRendering();
+        }
     }
 
     @Override

@@ -90,5 +90,10 @@
   "config.ayame_paperdoll.option.hide_under_debug.desc": "Hide under F3 debug screen.",
   "config.ayame_paperdoll.option.hide_on_screen_open.desc": "Hide when a screen (e.g., game menu or inventory) is open.",
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "Automatically switch entity model in spectator mode.\n\nOverrides §2Player Name§r option if enabled.",
-  "config.ayame_paperdoll.option.player_name.desc": "The name of the player to render. It will be your name when left blank."
+  "config.ayame_paperdoll.option.player_name.desc": "The name of the player to render. It will be your name when left blank.",
+  "config.ayame_paperdoll.category.ds_compat": "Dragon Survival Compat",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "Auto Scale Dragon to Human Height",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "Scales a dragon whose model grew beyond human height back to human height in the paper doll, so it doesn't overflow the screen. Only affects the paper doll rendering.",
+  "config.ayame_paperdoll.option.ds_glide_forward": "DS Glide Body Forward",
+  "config.ayame_paperdoll.option.ds_glide_forward.desc": "Keeps the paper doll dragon body facing forward while the dragon player glides, instead of wobbling side to side."
 }

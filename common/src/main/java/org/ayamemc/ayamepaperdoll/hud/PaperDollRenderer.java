@@ -38,6 +38,7 @@ import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import com.hoz.ayamedscompat.AyameDSCompat;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
 import org.ayamemc.ayamepaperdoll.hud.DataBackup.DataBackupEntry;
@@ -309,6 +310,26 @@ public class PaperDollRenderer {
 
     //also check =InventoryScreen#extractRenderState
     private EntityRenderState extractRenderState(Entity targetEntity, float a){
+        // DS compat: for a dragon player, use DragonSurvival's UI render state so the paper
+        // doll shows the dragon instead of the human model. The pose is the paper doll's locked
+        // values (yBodyRot / head aligned / xRot); auto-scale is the config-driven toggle.
+        // Falls back to the vanilla state when the entity is not a dragon or DS is absent.
+        if (targetEntity instanceof LivingEntity livingEntity) {
+            EntityRenderState dragonState = AyameDSCompat.createDragonUIRenderState(
+                    livingEntity, a,
+                    livingEntity.yBodyRot, 0.0, livingEntity.getXRot(),
+                    CONFIGS.autoScaleDragonToHumanHeight.getValue());
+            if (dragonState != null) {
+                // DS compat active only for dragon players; gate it so normal human models
+                // are never touched by the DS rendering hooks.
+                AyameDSCompat.setCompatTargetDragon(true);
+                dragonState.lightCoords = getLight(targetEntity, a);
+                dragonState.shadowPieces.clear();
+                dragonState.outlineColor = 0;
+                return dragonState;
+            }
+        }
+        AyameDSCompat.setCompatTargetDragon(false);
         EntityRenderDispatcher entityRenderDispatcher = minecraft.getEntityRenderDispatcher();
         EntityRenderer<? super Entity, ?> entityRenderer = entityRenderDispatcher.getRenderer(targetEntity);
         EntityRenderState state = entityRenderer.createRenderState(targetEntity, a);

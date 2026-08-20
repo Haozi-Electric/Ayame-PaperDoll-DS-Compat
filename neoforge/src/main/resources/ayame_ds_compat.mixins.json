@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "com.hoz.ayamedscompat.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "CompatDisplayNeckMixin",
+    "ClientDragonRendererAccessor",
+    "DragonRenderDataAccessor",
+    "DragonRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
