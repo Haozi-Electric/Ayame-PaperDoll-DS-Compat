@@ -6,7 +6,6 @@
   "client": [
     "ClientDragonRendererMixin",
     "CompatDisplayNeckMixin",
-    "DragonModelMixin",
     "DragonRendererMixin"
   ],
   "injectors": {

@@ -28,14 +28,17 @@ import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
 import by.dragonsurvivalteam.dragonsurvival.server.handlers.ServerFlightHandler;
 import com.hoz.ayamedscompat.AyameDSCompat;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = DragonRenderer.class, remap = false)
 public abstract class DragonRendererMixin {
@@ -45,10 +48,22 @@ public abstract class DragonRendererMixin {
     @Unique
     private boolean ayamedscompat$needsRestore;
 
-    // Anchor the dragon's body yaw to the paper doll's locked pose. This affects
-    // the pose rotation applied inside setupRender itself; the head/neck pose is
-    // anchored separately in DragonModelMixin at applyMolangQueries (the point
-    // where the movement data actually reaches the animation).
+    // In-world, DragonRenderer offsets the model from the entity by an amount derived from the
+    // live MovementData bodyYaw and the dragon's size. In the paper doll that live offset makes
+    // the model orbit the preview origin when the view rotates, so we zero it during compat
+    // rendering and let the paper doll's own translation center the model.
+    @Inject(method = "getModelOffset", at = @At("HEAD"), cancellable = true, remap = false)
+    private void ayamedscompat$centerModel(final DragonEntity dragon, final float partialTicks,
+                                           final CallbackInfoReturnable<Vec3> cir) {
+        if (AyameDSCompat.isRenderingForCompat()) {
+            cir.setReturnValue(Vec3.ZERO);
+        }
+    }
+
+    // Anchor the dragon's body yaw to the paper doll's locked pose (player.yBodyRot) so the
+    // body faces the camera. This only affects the rotation applied inside setupRender; it is
+    // restored at RETURN so the animation (applyMolangQueries, which runs afterwards) still
+    // sees the real world bodyYaw and the tail keeps its natural swing.
     @Inject(method = "setupRender", at = @At("HEAD"), remap = false)
     private void ayamedscompat$overrideBodyYaw(final DragonEntity dragon, final Player player,
                                                final PoseStack pose, final float partialTick,
@@ -73,13 +88,16 @@ public abstract class DragonRendererMixin {
         ayamedscompat$needsRestore = false;
     }
 
+    // During compat, suppress the gliding pitch/roll applied in setupRender so the paper doll
+    // dragon stays level (config ds_glide_wobble). When the wobble is enabled, the real
+    // isGliding value is returned so the body pitches/banks like the world dragon.
     @WrapOperation(method = "setupRender", at = @At(value = "INVOKE",
             target = "Lby/dragonsurvivalteam/dragonsurvival/server/handlers/ServerFlightHandler;"
                    + "isGliding(Lnet/minecraft/world/entity/player/Player;)Z"),
             remap = false)
     private boolean ayamedscompat$forceRenderBodyInSetupRender(final Player player,
                                                                final Operation<Boolean> original) {
-        if (AyameDSCompat.isRenderingForCompat()) {
+        if (AyameDSCompat.isRenderingForCompat() && !AyamePaperDoll.CONFIGS.dsGlideWobble.getValue()) {
             return false;
         }
         return original.call(player);

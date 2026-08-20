@@ -102,5 +102,7 @@
   "config.ayame_paperdoll.option.debug_force_disable_culling": "Force Disable Culling",
   "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "Force-disable face culling instead of flipping it in mirror mode.\nIf mirror mode works with this on, the flip-cull logic is being overridden.\n§cWarning: causes DS dragon wing z-fighting. Diagnostic only!",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "Auto Scale Dragon to Human Height",
-  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "Scales a dragon whose model grew beyond human height back to human height in the paper doll, so it doesn't overflow the screen. Only affects the paper doll rendering."
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "Scales a dragon whose model grew beyond human height back to human height in the paper doll, so it doesn't overflow the screen. Only affects the paper doll rendering.",
+  "config.ayame_paperdoll.option.ds_glide_wobble": "Glide Wobble",
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "Lets the paper doll dragon pitch down and bank side to side while gliding, just like the dragon in the world. Only affects the paper doll rendering."
 }

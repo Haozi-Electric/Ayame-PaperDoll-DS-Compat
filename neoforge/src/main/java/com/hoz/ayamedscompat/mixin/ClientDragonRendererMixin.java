@@ -23,85 +23,77 @@
 package com.hoz.ayamedscompat.mixin;
 
 import by.dragonsurvivalteam.dragonsurvival.client.render.ClientDragonRenderer;
+import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
 import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
 import by.dragonsurvivalteam.dragonsurvival.server.handlers.ServerFlightHandler;
 import com.hoz.ayamedscompat.AyameDSCompat;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.client.event.RenderPlayerEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Renders the paper doll dragon with the SAME data the third-person render uses.
+ *
+ * ClientDragonRenderer.renderDragon (fired by the paper doll's entity render) normally runs
+ * setDragonMovementData + handleFlightMovement again. In third person the world render already
+ * ran those this frame, so re-running them double-advances the angles and feeds the animation a
+ * bodyYaw that lags the view (frozen head, tail bending with the view deviation) — we skip them.
+ *
+ * In first-person glide the world render deliberately does NOT render the dragon (DS skips the
+ * body in first person), so MovementData would be stale and the paper doll dragon would freeze.
+ * In that case we DO run them, exactly like a third-person render would, so the first-person
+ * paper doll shows the third-person glide dragon.
+ *
+ * isGliding is still forced false in the renderDragon condition so the paper doll always renders
+ * the dragon; the glide pitch/roll remains suppressed by DragonRendererMixin.setupRender so the
+ * body stays level like the third-person paper doll.
+ */
 @Mixin(value = ClientDragonRenderer.class, remap = false)
 public abstract class ClientDragonRendererMixin {
 
+    // True when the world render will NOT have prepared the dragon this frame: the local player
+    // is gliding in first person with first-person-flight rendering disabled (DS skips the body).
     @Unique
-    private static double ayamedscompat$savedHeadYaw;
-    @Unique
-    private static double ayamedscompat$savedHeadPitch;
-    @Unique
-    private static double ayamedscompat$savedBodyYaw;
-    @Unique
-    private static double ayamedscompat$savedHeadYawLastFrame;
-    @Unique
-    private static double ayamedscompat$savedHeadPitchLastFrame;
-    @Unique
-    private static double ayamedscompat$savedBodyYawLastFrame;
-    @Unique
-    private static Vec3 ayamedscompat$savedDeltaMovement;
-    @Unique
-    private static Vec3 ayamedscompat$savedDeltaMovementLastFrame;
-    @Unique
-    private static boolean ayamedscompat$movementSaved;
-
-    // DS's setDragonMovementData is left running during the paper doll so the
-    // head/neck/tail animation keeps getting real data (previously we cancelled
-    // it, which froze them at the pre-glide pose). We only save/restore the
-    // movement data around the render so the real-world values aren't corrupted.
-    @Inject(method = "renderDragon", at = @At("HEAD"), remap = false)
-    private static void ayamedscompat$saveMovement(final RenderPlayerEvent.Pre event, final CallbackInfo ci) {
-        if (!AyameDSCompat.isRenderingForCompat() || ayamedscompat$movementSaved) {
-            return;
-        }
-        if (!(event.getEntity() instanceof Player player)) {
-            return;
-        }
-        MovementData movement = MovementData.getData(player);
-        ayamedscompat$savedHeadYaw = movement.headYaw;
-        ayamedscompat$savedHeadPitch = movement.headPitch;
-        ayamedscompat$savedBodyYaw = movement.bodyYaw;
-        ayamedscompat$savedHeadYawLastFrame = movement.headYawLastFrame;
-        ayamedscompat$savedHeadPitchLastFrame = movement.headPitchLastFrame;
-        ayamedscompat$savedBodyYawLastFrame = movement.bodyYawLastFrame;
-        ayamedscompat$savedDeltaMovement = movement.deltaMovement;
-        ayamedscompat$savedDeltaMovementLastFrame = movement.deltaMovementLastFrame;
-        ayamedscompat$movementSaved = true;
+    private static boolean ayamedscompat$worldDidNotPrepareDragon(final Player player) {
+        return player == Minecraft.getInstance().player
+                && Minecraft.getInstance().options.getCameraType().isFirstPerson()
+                && ServerFlightHandler.isGliding(player)
+                && !ClientDragonRenderer.renderFirstPersonFlight;
     }
 
-    @Inject(method = "renderDragon", at = @At("RETURN"), remap = false)
-    private static void ayamedscompat$restoreMovement(final RenderPlayerEvent.Pre event, final CallbackInfo ci) {
-        if (!ayamedscompat$movementSaved) {
-            return;
+    @WrapOperation(method = "renderDragon",
+            at = @At(value = "INVOKE",
+                    target = "Lby/dragonsurvivalteam/dragonsurvival/client/render/ClientDragonRenderer;"
+                           + "setDragonMovementData(Lnet/minecraft/world/entity/player/Player;F)V"),
+            remap = false)
+    private static void ayamedscompat$conditionalSetDragonMovementData(final Player player, final float realtimeDeltaTick,
+                                                                       final Operation<Void> original) {
+        if (!AyameDSCompat.isRenderingForCompat()) {
+            original.call(player, realtimeDeltaTick);
+        } else if (ayamedscompat$worldDidNotPrepareDragon(player)) {
+            original.call(player, realtimeDeltaTick);
         }
-        if (!(event.getEntity() instanceof Player player)) {
-            ayamedscompat$movementSaved = false;
-            return;
+    }
+
+    @WrapOperation(method = "renderDragon",
+            at = @At(value = "INVOKE",
+                    target = "Lby/dragonsurvivalteam/dragonsurvival/client/render/ClientDragonRenderer;"
+                           + "handleFlightMovement(Lnet/minecraft/world/entity/player/Player;"
+                           + "Lby/dragonsurvivalteam/dragonsurvival/common/entity/DragonEntity;"
+                           + "Lby/dragonsurvivalteam/dragonsurvival/registry/attachments/MovementData;F)V"),
+            remap = false)
+    private static void ayamedscompat$conditionalHandleFlightMovement(final Player player, final DragonEntity dragon,
+                                                                      final MovementData movement, final float partialTick,
+                                                                      final Operation<Void> original) {
+        if (!AyameDSCompat.isRenderingForCompat()) {
+            original.call(player, dragon, movement, partialTick);
+        } else if (ayamedscompat$worldDidNotPrepareDragon(player)) {
+            original.call(player, dragon, movement, partialTick);
         }
-        MovementData movement = MovementData.getData(player);
-        movement.headYaw = ayamedscompat$savedHeadYaw;
-        movement.headPitch = ayamedscompat$savedHeadPitch;
-        movement.bodyYaw = ayamedscompat$savedBodyYaw;
-        movement.headYawLastFrame = ayamedscompat$savedHeadYawLastFrame;
-        movement.headPitchLastFrame = ayamedscompat$savedHeadPitchLastFrame;
-        movement.bodyYawLastFrame = ayamedscompat$savedBodyYawLastFrame;
-        movement.deltaMovement = ayamedscompat$savedDeltaMovement;
-        movement.deltaMovementLastFrame = ayamedscompat$savedDeltaMovementLastFrame;
-        ayamedscompat$movementSaved = false;
     }
 
     @WrapOperation(method = "renderDragon", at = @At(value = "INVOKE",
@@ -110,18 +102,6 @@ public abstract class ClientDragonRendererMixin {
             remap = false)
     private static boolean ayamedscompat$forceRenderBody(final Player player,
                                                          final Operation<Boolean> original) {
-        if (AyameDSCompat.isRenderingForCompat()) {
-            return false;
-        }
-        return original.call(player);
-    }
-
-    @WrapOperation(method = "handleFlightMovement", at = @At(value = "INVOKE",
-            target = "Lby/dragonsurvivalteam/dragonsurvival/server/handlers/ServerFlightHandler;"
-                   + "isGliding(Lnet/minecraft/world/entity/player/Player;)Z"),
-            remap = false, require = 0)
-    private static boolean ayamedscompat$forceRenderBodyInFlightMovement(final Player player,
-                                                                         final Operation<Boolean> original) {
         if (AyameDSCompat.isRenderingForCompat()) {
             return false;
         }

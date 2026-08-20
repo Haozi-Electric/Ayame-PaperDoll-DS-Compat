@@ -73,6 +73,7 @@ public class Configs {
     public final SimpleOption<Boolean> spectatorAutoSwitch = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("spectator_auto_switch"), true);
     public final SimpleOption<String> playerName = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("player_name"), "");
     public final SimpleOption<Boolean> autoScaleDragonToHumanHeight = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_scale_dragon_to_human_height"), true);
+    public final SimpleOption<Boolean> dsGlideWobble = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("ds_glide_wobble"), false);
     public final SimpleOption<Integer> lastConfigTabIdx = new SimpleOption<>(HIDDEN_CATEGORY, AyamePaperDoll.path("last_config_tab_idx"), 0);
     public final SimpleOption<Boolean> debugMode = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_mode"), false);
     public final SimpleOption<Boolean> debugLogCullFace = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_log_cull_face"), false);

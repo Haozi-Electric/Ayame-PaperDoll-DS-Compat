@@ -102,5 +102,7 @@
   "config.ayame_paperdoll.option.debug_force_disable_culling": "强制禁用剔除",
   "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "强制关闭面剔除（替代镜像时的翻转剔除）。\n如果镜像模式在此选项开启后恢复正常，说明翻转剔除逻辑被其他模组覆盖了。\n§c注意：会导致 DS 龙翅膀 z-fighting 闪烁。仅用于诊断！",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "自动缩放龙到人类高度",
-  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "将长大超过人类身高的龙模型在纸娃娃中自动缩放到人类高度，避免超出屏幕。仅影响纸娃娃渲染。"
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "将长大超过人类身高的龙模型在纸娃娃中自动缩放到人类高度，避免超出屏幕。仅影响纸娃娃渲染。",
+  "config.ayame_paperdoll.option.ds_glide_wobble": "滑翔摆动",
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "滑翔时纸娃娃龙会像世界中的龙一样俯冲低头并向侧面倾斜摆动（东倒西歪）。仅影响纸娃娃渲染。"
 }

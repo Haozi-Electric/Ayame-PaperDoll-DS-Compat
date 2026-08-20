@@ -63,10 +63,10 @@ dependencies {
 
     implementation "curse.maven:dragons-survival-420799:8010249"
 
-    // GeckoLib is not exposed transitively by DragonSurvival, but the DS-compat
-    // DragonModelMixin references GeckoLib's AnimationState at compile time.
-    // Resolve the locally cached jar (a proper maven coordinate can replace
-    // this when network is available).
+    // GeckoLib is not exposed transitively by DragonSurvival, but DragonEntity extends
+    // GeckoLib's GeoEntity, so calling dragon.getScale() in AyameDSCompatMod needs the
+    // GeckoLib classes at compile time. Resolve the locally cached jar (a proper maven
+    // coordinate can replace this when network is available).
     def geckolibCache = fileTree(dir: "${System.getProperty('user.home')}/.gradle/caches/modules-2/files-2.1/software.bernie.geckolib/geckolib-neoforge-1.21.1/4.8.4",
             include: ['*/geckolib-neoforge-1.21.1-4.8.4.jar'])
     compileOnly geckolibCache
