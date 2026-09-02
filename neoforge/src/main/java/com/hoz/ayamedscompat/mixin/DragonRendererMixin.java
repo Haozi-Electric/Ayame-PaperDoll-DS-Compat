@@ -46,6 +46,10 @@ public abstract class DragonRendererMixin {
     @Unique
     private double ayamedscompat$savedBodyYaw;
     @Unique
+    private float ayamedscompat$savedPrevXRot;
+    @Unique
+    private float ayamedscompat$savedPrevZRot;
+    @Unique
     private boolean ayamedscompat$needsRestore;
 
     // In-world, DragonRenderer offsets the model from the entity by an amount derived from the
@@ -74,6 +78,15 @@ public abstract class DragonRendererMixin {
         final MovementData movement = MovementData.getData(player);
         ayamedscompat$savedBodyYaw = movement.bodyYaw;
         movement.bodyYaw = player.yBodyRot;
+        // Newer DS wings the glide condition off dragon.prevXRot/prevZRot as well. When the
+        // wobble is disabled, zero them so the release condition (isGliding forced false below
+        // AND prevXRot/prevZRot == 0) keeps the body level; restore them at RETURN.
+        if (!AyamePaperDoll.CONFIGS.dsGlideWobble.getValue()) {
+            ayamedscompat$savedPrevXRot = dragon.prevXRot;
+            ayamedscompat$savedPrevZRot = dragon.prevZRot;
+            dragon.prevXRot = 0;
+            dragon.prevZRot = 0;
+        }
         ayamedscompat$needsRestore = true;
     }
 
@@ -85,6 +98,10 @@ public abstract class DragonRendererMixin {
             return;
         }
         MovementData.getData(player).bodyYaw = ayamedscompat$savedBodyYaw;
+        if (!AyamePaperDoll.CONFIGS.dsGlideWobble.getValue()) {
+            dragon.prevXRot = ayamedscompat$savedPrevXRot;
+            dragon.prevZRot = ayamedscompat$savedPrevZRot;
+        }
         ayamedscompat$needsRestore = false;
     }
 

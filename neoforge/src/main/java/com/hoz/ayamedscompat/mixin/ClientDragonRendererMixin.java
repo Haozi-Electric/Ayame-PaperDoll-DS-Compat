@@ -34,23 +34,28 @@ import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Renders the paper doll dragon with the SAME data the third-person render uses.
  *
- * ClientDragonRenderer.renderDragon (fired by the paper doll's entity render) normally runs
- * setDragonMovementData + handleFlightMovement again. In third person the world render already
- * ran those this frame, so re-running them double-advances the angles and feeds the animation a
- * bodyYaw that lags the view (frozen head, tail bending with the view deviation) — we skip them.
+ * DS's renderDragon prepares the dragon each frame (setDragonMovementData + handleFlightMovement).
+ * In the paper doll (compat):
+ *  - Third person: the world render already prepared the dragon this frame, so re-preparing it
+ *    double-advances the angles and feeds the animation a bodyYaw that lags the view (frozen head,
+ *    tail bending with the view deviation) — we skip the prepare step and use the world's data.
+ *  - First-person glide: the world render deliberately skips the dragon body, so nothing was
+ *    prepared this frame — we run the prepare step so the first-person paper doll shows the
+ *    third-person glide dragon.
  *
- * In first-person glide the world render deliberately does NOT render the dragon (DS skips the
- * body in first person), so MovementData would be stale and the paper doll dragon would freeze.
- * In that case we DO run them, exactly like a third-person render would, so the first-person
- * paper doll shows the third-person glide dragon.
+ * DS version differences: the old DS calls setDragonMovementData / handleFlightMovement inside
+ * renderDragon; the new flight system (v2.0.68+) moved them into prepareDragonRenderState. We
+ * wrap the old call sites with require=0 (silently skipped when absent) and inject at
+ * prepareDragonRenderState HEAD for the new version, keeping the mod compatible with both.
  *
  * isGliding is still forced false in the renderDragon condition so the paper doll always renders
- * the dragon; the glide pitch/roll remains suppressed by DragonRendererMixin.setupRender so the
- * body stays level like the third-person paper doll.
+ * the dragon; the glide pitch/roll is handled by DragonRendererMixin.setupRender.
  */
 @Mixin(value = ClientDragonRenderer.class, remap = false)
 public abstract class ClientDragonRendererMixin {
@@ -65,7 +70,19 @@ public abstract class ClientDragonRendererMixin {
                 && !ClientDragonRenderer.renderFirstPersonFlight;
     }
 
-    @WrapOperation(method = "renderDragon",
+    // New DS (2.0.68+): prepareDragonRenderState bundles setDragonMovementData + handleFlightMovement.
+    // Skip the whole step in third-person compat; let it run in first-person glide.
+    @Inject(method = "prepareDragonRenderState", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
+    private static void ayamedscompat$skipPrepareInThirdPerson(final Player player, final DragonEntity dragon,
+                                                               final float partialTick, final CallbackInfo ci) {
+        if (AyameDSCompat.isRenderingForCompat() && !ayamedscompat$worldDidNotPrepareDragon(player)) {
+            ci.cancel();
+        }
+    }
+
+    // Old DS: setDragonMovementData is called directly in renderDragon. Wrapped with require=0 so the
+    // injection is absent (and harmless) under the new DS, where the call moved to prepareDragonRenderState.
+    @WrapOperation(method = "renderDragon", require = 0,
             at = @At(value = "INVOKE",
                     target = "Lby/dragonsurvivalteam/dragonsurvival/client/render/ClientDragonRenderer;"
                            + "setDragonMovementData(Lnet/minecraft/world/entity/player/Player;F)V"),
@@ -79,7 +96,8 @@ public abstract class ClientDragonRendererMixin {
         }
     }
 
-    @WrapOperation(method = "renderDragon",
+    // Old DS: handleFlightMovement is called directly in renderDragon. Same require=0 note as above.
+    @WrapOperation(method = "renderDragon", require = 0,
             at = @At(value = "INVOKE",
                     target = "Lby/dragonsurvivalteam/dragonsurvival/client/render/ClientDragonRenderer;"
                            + "handleFlightMovement(Lnet/minecraft/world/entity/player/Player;"
