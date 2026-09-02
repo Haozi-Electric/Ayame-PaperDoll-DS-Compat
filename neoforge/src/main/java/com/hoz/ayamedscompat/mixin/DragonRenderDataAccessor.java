@@ -27,12 +27,18 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 /**
- * Lets the paper doll override the dragon's body yaw on the RENDER data only, leaving
- * MovementData (and therefore the head/neck animation, which reads it) untouched.
+ * Lets the paper doll override the dragon's body yaw and glide pitch/roll on the RENDER data
+ * only, leaving MovementData (and therefore the head/neck animation, which reads it) untouched.
  */
 @Mixin(DragonRenderer.DragonRenderData.class)
 public interface DragonRenderDataAccessor {
 
     @Accessor("bodyYaw")
     void ds$setBodyYaw(double bodyYaw);
+
+    @Accessor("prevXRot")
+    void ds$setPrevXRot(float prevXRot);
+
+    @Accessor("prevZRot")
+    void ds$setPrevZRot(float prevZRot);
 }

@@ -40,6 +40,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
+import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 
 /**
  * NeoForge mod registration shell.
@@ -83,7 +84,16 @@ public final class AyameDSCompatMod {
                     DragonRenderer.DragonRenderData renderData = geo.getGeckolibData(DragonRenderer.DRAGON_RENDER_DATA);
                     if (renderData != null) {
                         // DragonRenderData is final, so cast through Object for the mixin accessor.
-                        ((DragonRenderDataAccessor) (Object) renderData).ds$setBodyYaw(bodyYaw);
+                        DragonRenderDataAccessor accessor = (DragonRenderDataAccessor) (Object) renderData;
+                        accessor.ds$setBodyYaw(bodyYaw);
+                        // Newer DS wings the setupRender glide release condition off
+                        // renderData.prevXRot/prevZRot as well. When glide-forward is enabled, zero
+                        // them on the render data so the paper doll body stays level; the head/neck
+                        // animation keeps reading the real MovementData so it stays natural.
+                        if (AyamePaperDoll.CONFIGS.dsGlideForward.getValue()) {
+                            accessor.ds$setPrevXRot(0);
+                            accessor.ds$setPrevZRot(0);
+                        }
                     }
                 }
                 if (autoScale && renderState instanceof LivingEntityRenderState living) {
