@@ -36,13 +36,16 @@ import org.lwjgl.opengl.GL11;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityAttachment;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.phys.Vec3;
 import com.hoz.ayamedscompat.AyameDSCompat;
+import com.hoz.ayamedscompat.AyameDSCompat.SeatTransform;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
@@ -51,8 +54,12 @@ import org.joml.Matrix4fStack;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.ayamemc.ayamepaperdoll.AyamePaperDoll.CONFIGS;
 
@@ -84,8 +91,9 @@ public class PaperDollRenderer {
             new DataBackupEntry<>(e -> e.getSharedFlag(0), (e, flag) -> e.setSharedFlag(0, flag)) // on fire
     );
     private static final PaperDollRenderer instance = new PaperDollRenderer();
+    private static long lastChainDebugLogNanos;
+    private static long lastChainFitLogNanos;
     private final Minecraft minecraft = Minecraft.getInstance();
-    private Rectangle2D.Double currentRenderBounds;
 
     private PaperDollRenderer() {
     }
@@ -141,6 +149,13 @@ public class PaperDollRenderer {
         int scaledHeight = minecraft.getWindow().getGuiScaledHeight();
         Configs.PoseOffsetMethod poseOffsetMethod = CONFIGS.poseOffsetMethod.getValue();
 
+        List<LivingEntity> ridingChain = buildRidingChain(targetEntity, poseOffsetMethod);
+        if (ridingChain != null) {
+            renderRidingChain(ridingChain, targetEntity, poseOffsetMethod, partialTicks,
+                    scaledWidth, scaledHeight);
+            return;
+        }
+
         var backup = new DataBackup<>(targetEntity, LIVINGENTITY_BACKUP_ENTRIES);
         backup.save();
 
@@ -187,7 +202,312 @@ public class PaperDollRenderer {
         backup.restore();
     }
 
+    /** Returns the rendered riding chain, or null for the legacy target/vehicle path. */
+    private List<LivingEntity> buildRidingChain(LivingEntity target, Configs.PoseOffsetMethod poseOffsetMethod) {
+        if (poseOffsetMethod == Configs.PoseOffsetMethod.FORCE_STANDING) {
+            return null;
+        }
+
+        final boolean includeVehicle = CONFIGS.renderVehicle.getValue() && target.isPassenger();
+        final boolean includePassengers = CONFIGS.renderPassengers.getValue();
+        if (!includeVehicle && !includePassengers) {
+            return null;
+        }
+
+        List<LivingEntity> chain = new ArrayList<>();
+
+        if (includeVehicle) {
+            List<LivingEntity> ancestors = new ArrayList<>();
+            for (Entity entity = target; entity != null; entity = entity.getVehicle()) {
+                if (!(entity instanceof LivingEntity living)) {
+                    return null; // non-living mounts keep the legacy path
+                }
+                ancestors.add(living);
+            }
+            Collections.reverse(ancestors);
+            // Every mount needs a dragon seat anchor.
+            for (int i = 0; i < ancestors.size() - 1; i++) {
+                if (!AyameDSCompat.isDragon(ancestors.get(i))) {
+                    return null;
+                }
+            }
+            chain.addAll(ancestors);
+        } else {
+            chain.add(target);
+        }
+
+        if (includePassengers) {
+            collectRenderedPassengers(target, chain);
+        }
+
+        return chain.size() > 1 ? chain : null;
+    }
+
+    private void collectRenderedPassengers(LivingEntity mount, List<LivingEntity> chain) {
+        for (Entity passenger : mount.getPassengers()) {
+            if (!(passenger instanceof LivingEntity living)) {
+                continue;
+            }
+            // CarryOn carried players bypass the MountingBone with their own front-carry offset.
+            if (!AyameDSCompat.isDragon(mount) && !AyameDSCompat.isCarriedPassenger(mount, living)) {
+                continue;
+            }
+            chain.add(living);
+            collectRenderedPassengers(living, chain);
+        }
+    }
+
+    private void renderRidingChain(List<LivingEntity> chain, LivingEntity targetEntity,
+                                   Configs.PoseOffsetMethod poseOffsetMethod, float partialTicks,
+                                   int scaledWidth, int scaledHeight) {
+        final LivingEntity root = chain.get(0);
+        final RotationMode rotationMode = CONFIGS.rotationMode.getValue();
+        final boolean mirror = CONFIGS.mirrored.getValue();
+        final boolean needCullFix = needsCullFix(mirror);
+
+        List<DataBackup<LivingEntity>> backups = new ArrayList<>(chain.size());
+        for (LivingEntity entity : chain) {
+            DataBackup<LivingEntity> backup = new DataBackup<>(entity, LIVINGENTITY_BACKUP_ENTRIES);
+            backup.save();
+            backups.add(backup);
+        }
+
+        EntityRenderDispatcher entityRenderDispatcher = minecraft.getEntityRenderDispatcher();
+
+        try {
+            for (LivingEntity entity : chain) {
+                transformEntity(entity, partialTicks, false);
+            }
+
+            Map<LivingEntity, List<LivingEntity>> renderedChildren = buildRenderedChildren(chain);
+
+            Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+            modelViewStack.pushMatrix();
+            modelViewStack.scale(1, 1, -1);
+            modelViewStack.rotateY((float) Math.toRadians(CONFIGS.lightDegree.getValue() + 180));
+            RenderSystem.applyModelViewMatrix();
+
+            PoseStack poseStack = new PoseStack();
+            poseStack.mulPose(Axis.YP.rotationDegrees(-CONFIGS.lightDegree.getValue().floatValue() - 180.0F));
+            poseStack.translate(CONFIGS.offsetX.getValue() * scaledWidth,
+                    CONFIGS.offsetY.getValue() * scaledHeight, 0);
+            if (mirror) {
+                poseStack.scale(-1, 1, 1);
+            }
+            float size = (float) (CONFIGS.size.getValue() * scaledHeight);
+            // Normalize the root and keep every other member at its world-relative size.
+            float groupScale = 1.0f;
+            if (CONFIGS.autoScaleDragonToHumanHeight.getValue()) {
+                groupScale = AyameDSCompat.getDragonScaleFactor(root);
+            }
+            float fitScale = getChainFitScale(chain, root, groupScale);
+            poseStack.scale(size, size, size);
+            if (groupScale != 1.0f) {
+                poseStack.scale(groupScale, groupScale, groupScale);
+            }
+            if (fitScale != 1.0f) {
+                poseStack.scale(fitScale, fitScale, fitScale);
+                if (CONFIGS.debugMode.getValue()) {
+                    long now = System.nanoTime();
+                    if (now - lastChainFitLogNanos > 1_000_000_000L) {
+                        lastChainFitLogNanos = now;
+                        AyamePaperDoll.LOGGER.info("[Debug] auto-fit riding chain: nodes={}, fit={}",
+                                chain.size(), fitScale);
+                    }
+                }
+            }
+
+            Quaternionf zRot = new Quaternionf().rotateZ((float) Math.PI);
+            Quaternionf xyzRot = new Quaternionf().rotateXYZ(
+                    (float) Math.toRadians(CONFIGS.rotationX.getValue()),
+                    (float) Math.toRadians(CONFIGS.rotationY.getValue()),
+                    (float) Math.toRadians(CONFIGS.rotationZ.getValue()));
+            zRot.mul(xyzRot);
+            poseStack.mulPose(zRot);
+
+            Lighting.setupForEntityInInventory();
+            xyzRot.conjugate();
+
+            entityRenderDispatcher.overrideCameraOrientation(xyzRot);
+            boolean renderHitbox = entityRenderDispatcher.shouldRenderHitBoxes();
+            entityRenderDispatcher.setRenderHitBoxes(false);
+            entityRenderDispatcher.setRenderShadow(false);
+            MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
+
+            if (needCullFix) {
+                applyCullFix(mirror);
+            }
+            bufferSource.ayame_PaperDoll$setFlipCullFace(mirror);
+
+            AyameDSCompat.pushCompatRendering();
+            try {
+                poseStack.pushPose();
+                try {
+                    if (root == targetEntity) {
+                        double poseOffsetY = getPoseOffsetY(targetEntity, partialTicks, poseOffsetMethod);
+                        if (poseOffsetY != 0) {
+                            poseStack.translate(0, poseOffsetY, 0);
+                        }
+                    }
+                    renderChainNode(poseStack, root, renderedChildren, rotationMode, partialTicks,
+                            bufferSource, entityRenderDispatcher);
+                } finally {
+                    poseStack.popPose();
+                }
+            } finally {
+                AyameDSCompat.popCompatRendering();
+            }
+
+            bufferSource.endBatch();
+            bufferSource.ayame_PaperDoll$setFlipCullFace(false);
+
+            if (needCullFix) {
+                restoreCullFix();
+            }
+
+            entityRenderDispatcher.setRenderShadow(true);
+            entityRenderDispatcher.setRenderHitBoxes(renderHitbox);
+
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
+            Lighting.setupFor3DItems();
+        } finally {
+            for (int i = backups.size() - 1; i >= 0; i--) {
+                backups.get(i).restore();
+            }
+        }
+    }
+
+    /** Conservative screen-fit scale for a multi-node chain; 1.0 when it fits. */
+    private static float getChainFitScale(List<LivingEntity> chain, LivingEntity root, float groupScale) {
+        if (!CONFIGS.autoFitRidingChain.getValue() || chain.size() <= 1) {
+            return 1.0f;
+        }
+
+        float rootHeight = Math.max(1.0f, root.getDimensions(root.getPose()).height() * groupScale);
+        float chainHeight = rootHeight + (chain.size() - 1) * Math.max(1.0f, rootHeight * 0.7f);
+        double size = CONFIGS.size.getValue();
+        double anchor = CONFIGS.offsetY.getValue();
+        // The doll grows upward from the anchor. Presets with the anchor below the screen can use
+        // almost the whole screen height; top-corner presets only have the space above the anchor.
+        float available = anchor >= 1.0 ? 0.95f : (float) Math.max(0.06, Math.min(0.95, anchor - 0.05));
+        float needed = (float) (chainHeight * size);
+        if (needed <= available) {
+            return 1.0f;
+        }
+        return Math.max(0.15f, available / needed);
+    }
+
+    private Map<LivingEntity, List<LivingEntity>> buildRenderedChildren(List<LivingEntity> chain) {
+        Set<LivingEntity> included = Collections.newSetFromMap(new IdentityHashMap<>());
+        included.addAll(chain);
+        Map<LivingEntity, List<LivingEntity>> children = new IdentityHashMap<>();
+        for (LivingEntity entity : chain) {
+            if (entity.getVehicle() instanceof LivingEntity mount && included.contains(mount)) {
+                children.computeIfAbsent(mount, key -> new ArrayList<>(1)).add(entity);
+            }
+        }
+        return children;
+    }
+
+    private void renderChainNode(PoseStack poseStack, LivingEntity node,
+                                 Map<LivingEntity, List<LivingEntity>> renderedChildren,
+                                 RotationMode rotationMode, float partialTicks,
+                                 MultiBufferSource.BufferSource bufferSource,
+                                 EntityRenderDispatcher entityRenderDispatcher) {
+        List<LivingEntity> children = renderedChildren.get(node);
+        if (children == null) {
+            children = List.of();
+        }
+
+        final boolean captureSeat = !children.isEmpty() && AyameDSCompat.isDragon(node);
+        if (captureSeat) {
+            AyameDSCompat.beginSeatCapture(node, poseStack.last().pose());
+        }
+
+        SeatTransform seat = null;
+        try {
+            final float rotationYaw = rotationMode == RotationMode.UNLOCK ? node.getYRot() : 0.0F;
+            final int packedLight = getLight(node, partialTicks);
+            RenderSystem.runAsFancy(() -> entityRenderDispatcher.render(node, 0.0, 0.0, 0.0,
+                    rotationYaw, partialTicks, poseStack, bufferSource, packedLight));
+            if (captureSeat) {
+                seat = AyameDSCompat.takeSeatTransform();
+            }
+        } finally {
+            if (captureSeat) {
+                AyameDSCompat.endSeatCapture();
+            }
+        }
+
+        for (LivingEntity child : children) {
+            poseStack.pushPose();
+            try {
+                if (seat != null) {
+                    // translate(seat) * rotate(bone tilt) * translate(-pivot). DS's render
+                    // correction wins over CarryOn when the mount has a MountingBone.
+                    poseStack.translate(seat.position().x, seat.position().y, seat.position().z);
+                    poseStack.mulPose(seat.tilt());
+                    Vec3 pivot = child.getVehicleAttachmentPoint(node);
+                    poseStack.translate(-pivot.x, -pivot.y, -pivot.z);
+
+                    if (CONFIGS.debugMode.getValue()) {
+                        long now = System.nanoTime();
+                        if (now - lastChainDebugLogNanos > 1_000_000_000L) {
+                            lastChainDebugLogNanos = now;
+                            AyamePaperDoll.LOGGER.info(
+                                    "[Debug] chain {} -> {}: seat=({}, {}, {}), tilt=({}, {}, {}, {}), pivot=({}, {}, {})",
+                                    node.getName().getString(), child.getName().getString(),
+                                    seat.position().x, seat.position().y, seat.position().z,
+                                    seat.tilt().x, seat.tilt().y, seat.tilt().z, seat.tilt().w,
+                                    pivot.x, pivot.y, pivot.z);
+                        }
+                    }
+                } else if (AyameDSCompat.isCarriedPassenger(node, child)) {
+                    // No MountingBone: CarryOn's front-carry offset is what the world shows.
+                    Vec3 carryOffset = new Vec3(0.0, 0.4, 0.6)
+                            .yRot((float) Math.toRadians(-node.yBodyRot));
+                    poseStack.translate(carryOffset.x, carryOffset.y, carryOffset.z);
+                    logChainVector("[Debug] chain (CarryOn) {} -> {}: offset=({}, {}, {})",
+                            node, child, carryOffset);
+                } else {
+                    // DS fallback without a MountingBone: vanilla PASSENGER point, no tilt.
+                    int passengerIndex = Math.max(0, node.getPassengers().indexOf(child));
+                    Vec3 attachment = node.getDimensions(node.getPose()).attachments()
+                            .getClamped(EntityAttachment.PASSENGER, passengerIndex, node.getYRot());
+                    poseStack.translate(attachment.x, attachment.y, attachment.z);
+                    Vec3 pivot = child.getVehicleAttachmentPoint(node);
+                    poseStack.translate(-pivot.x, -pivot.y, -pivot.z);
+                    logChainVector("[Debug] chain (no MountingBone fallback) {} -> {}: attachment=({}, {}, {})",
+                            node, child, attachment);
+                }
+                renderChainNode(poseStack, child, renderedChildren, rotationMode, partialTicks,
+                        bufferSource, entityRenderDispatcher);
+            } finally {
+                poseStack.popPose();
+            }
+        }
+    }
+
+    private static void logChainVector(String format, LivingEntity carrier, LivingEntity rider, Vec3 vector) {
+        if (!CONFIGS.debugMode.getValue()) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (now - lastChainDebugLogNanos <= 1_000_000_000L) {
+            return;
+        }
+        lastChainDebugLogNanos = now;
+        AyamePaperDoll.LOGGER.info(format, carrier.getName().getString(), rider.getName().getString(),
+                vector.x, vector.y, vector.z);
+    }
+
     private double getPoseOffsetY(LivingEntity targetEntity, float partialTicks, Configs.PoseOffsetMethod poseOffsetMethod) {
+        // These humanoid eye-height offsets would push a scaled dragon far off frame.
+        if (AyameDSCompat.isDragon(targetEntity)) {
+            return 0;
+        }
+
         if (poseOffsetMethod == Configs.PoseOffsetMethod.AUTO) {
             final float defaultPlayerEyeHeight = Player.DEFAULT_EYE_HEIGHT;
             final float defaultPlayerSwimmingBBHeight = Player.SWIMMING_BB_HEIGHT;
@@ -352,23 +672,10 @@ public class PaperDollRenderer {
         // Applied as global GL state so it survives mods that bypass or
         // replace BufferSource.endBatch (e.g. ImmediatelyFast).
         // TODO: 修复矿车锁定旋转时不被锁定的问题
-        final boolean needCullFix = mirror || (CONFIGS.debugMode.getValue()
-                && CONFIGS.debugForceDisableCulling.getValue());
+        final boolean needCullFix = needsCullFix(mirror);
 
         if (needCullFix) {
-            if (CONFIGS.debugMode.getValue() && CONFIGS.debugForceDisableCulling.getValue()) {
-                GL11.glDisable(GL11.GL_CULL_FACE);
-                if (CONFIGS.debugLogCullFace.getValue()) {
-                    AyamePaperDoll.LOGGER.info("[Debug] GL direct: glDisable(GL_CULL_FACE) pre-render");
-                }
-            } else if (mirror) {
-                GL11.glCullFace(GL11.GL_FRONT);
-                if (CONFIGS.debugMode.getValue() && CONFIGS.debugLogCullFace.getValue()) {
-                    int cullMode = GL11.glGetInteger(GL11.GL_CULL_FACE_MODE);
-                    AyamePaperDoll.LOGGER.info("[Debug] GL direct: glCullFace(GL_FRONT) pre-render, result=0x{}",
-                            String.format("%X", cullMode));
-                }
-            }
+            applyCullFix(mirror);
         }
 
         bufferSource.ayame_PaperDoll$setFlipCullFace(mirror);
@@ -382,11 +689,7 @@ public class PaperDollRenderer {
         bufferSource.ayame_PaperDoll$setFlipCullFace(false);
 
         if (needCullFix) {
-            GL11.glEnable(GL11.GL_CULL_FACE);
-            GL11.glCullFace(GL11.GL_BACK);
-            if (CONFIGS.debugMode.getValue() && CONFIGS.debugLogCullFace.getValue()) {
-                AyamePaperDoll.LOGGER.info("[Debug] GL direct: restored glEnable+glCullFace(GL_BACK) post-render");
-            }
+            restoreCullFix();
         }
 
         // do not need to restore this value in fact
@@ -396,5 +699,33 @@ public class PaperDollRenderer {
         modelViewStack.popMatrix();
         RenderSystem.applyModelViewMatrix();
         Lighting.setupFor3DItems();
+    }
+
+    private static boolean needsCullFix(boolean mirror) {
+        return mirror || (CONFIGS.debugMode.getValue() && CONFIGS.debugForceDisableCulling.getValue());
+    }
+
+    private static void applyCullFix(boolean mirror) {
+        if (CONFIGS.debugMode.getValue() && CONFIGS.debugForceDisableCulling.getValue()) {
+            GL11.glDisable(GL11.GL_CULL_FACE);
+            if (CONFIGS.debugLogCullFace.getValue()) {
+                AyamePaperDoll.LOGGER.info("[Debug] GL direct: glDisable(GL_CULL_FACE) pre-render");
+            }
+        } else if (mirror) {
+            GL11.glCullFace(GL11.GL_FRONT);
+            if (CONFIGS.debugMode.getValue() && CONFIGS.debugLogCullFace.getValue()) {
+                int cullMode = GL11.glGetInteger(GL11.GL_CULL_FACE_MODE);
+                AyamePaperDoll.LOGGER.info("[Debug] GL direct: glCullFace(GL_FRONT) pre-render, result=0x{}",
+                        String.format("%X", cullMode));
+            }
+        }
+    }
+
+    private static void restoreCullFix() {
+        GL11.glEnable(GL11.GL_CULL_FACE);
+        GL11.glCullFace(GL11.GL_BACK);
+        if (CONFIGS.debugMode.getValue() && CONFIGS.debugLogCullFace.getValue()) {
+            AyamePaperDoll.LOGGER.info("[Debug] GL direct: restored glEnable+glCullFace(GL_BACK) post-render");
+        }
     }
 }

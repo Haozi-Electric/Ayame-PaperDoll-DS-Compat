@@ -60,7 +60,7 @@
   "config.ayame_paperdoll.option.sneak_offset_y": "潜行Y轴修正",
   "config.ayame_paperdoll.option.swim_crawl_offset_y": "游泳/爬行Y轴修正",
   "config.ayame_paperdoll.option.elytra_offset_y": "鞘翅Y轴修正",
-  "config.ayame_paperdoll.option.pose_offset_method.desc": "在玩家处于不同姿态时修正玩家位置的方法\n\n§e自动§r：根据生物眼睛位置调整高度\n§e手动§r：手动设置潜行、游泳、鞘翅和爬行的修正\n§e强制站立§r：只渲染站立姿态\n§e关闭§r：不进行修正",
+  "config.ayame_paperdoll.option.pose_offset_method.desc": "在玩家处于不同姿态时修正玩家位置的方法\n\n§e自动§r：根据生物眼睛位置调整高度\n§e手动§r：手动设置潜行、游泳、鞘翅和爬行的修正\n§e强制站立§r：只渲染站立姿态\n§e关闭§r：不进行修正\n\n§7龙之生存的龙模型不受此选项影响，姿态由 DS 自行处理。§r",
   "config.ayame_paperdoll.option.sneak_offset_y.desc": "玩家潜行时的Y轴修正距离\n\n只在§a姿态修正方法§r为§e手动§r时有效",
   "config.ayame_paperdoll.option.swim_crawl_offset_y.desc": "玩家游泳或爬行时的Y轴修正距离\n\n只在§a姿态修正方法§r为§e手动§r时有效",
   "config.ayame_paperdoll.option.elytra_offset_y.desc": "玩家使用鞘翅飞行时的Y轴修正距离\n\n只在§a姿态修正方法§r为§e手动§r时有效",
@@ -71,6 +71,7 @@
   "config.ayame_paperdoll.option.use_world_light": "使用世界光",
   "config.ayame_paperdoll.option.world_light_min": "最小世界光",
   "config.ayame_paperdoll.option.render_vehicle": "渲染坐骑",
+  "config.ayame_paperdoll.option.render_passengers": "渲染乘客",
   "config.ayame_paperdoll.option.pause_game_on_config_screen": "配置时暂停游戏",
   "config.ayame_paperdoll.option.disable_config_screen_blur": "禁用背景模糊",
   "config.ayame_paperdoll.option.visible_during_activity": "仅在活动时显示",
@@ -84,6 +85,7 @@
   "config.ayame_paperdoll.option.use_world_light.desc": "是否使用世界中的光照等级来渲染",
   "config.ayame_paperdoll.option.world_light_min.desc": "打开§2使用世界光§r时的亮度下限",
   "config.ayame_paperdoll.option.render_vehicle.desc": "渲染身下的坐骑，§a姿态修正方法§r为§e强制站立§r时无效",
+  "config.ayame_paperdoll.option.render_passengers.desc": "渲染骑在你身上的乘客与整条骑乘链。适用于龙之生存的骑乘系统。",
   "config.ayame_paperdoll.option.pause_game_on_config_screen.desc": "是否在配置屏幕开启时暂停游戏（仅单人游戏下生效）",
   "config.ayame_paperdoll.option.disable_config_screen_blur.desc": "是否在游戏内配置屏幕显示背景模糊效果",
   "config.ayame_paperdoll.option.visible_during_activity.desc": "是否仅在疾跑、跳跃、飞行、坐下、游泳、爬行、使用鞘翅飞行时显示",
@@ -103,6 +105,10 @@
   "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "强制关闭面剔除（替代镜像时的翻转剔除）。\n如果镜像模式在此选项开启后恢复正常，说明翻转剔除逻辑被其他模组覆盖了。\n§c注意：会导致 DS 龙翅膀 z-fighting 闪烁。仅用于诊断！",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "自动缩放龙到人类高度",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "将长大超过人类身高的龙模型在纸娃娃中自动缩放到人类高度，避免超出屏幕。仅影响纸娃娃渲染。",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain": "自动适配骑乘链",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain.desc": "当载具和乘客叠成的整条骑乘链会超出屏幕时，按比例缩小整组模型，保证全部可见。仅影响纸娃娃；关闭后完全使用配置的尺寸。",
   "config.ayame_paperdoll.option.ds_glide_wobble": "滑翔摆动",
-  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "滑翔时纸娃娃龙会像世界中的龙一样俯冲低头并向侧面倾斜摆动（东倒西歪）。仅影响纸娃娃渲染。"
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "滑翔时纸娃娃龙会像世界中的龙一样俯冲低头并向侧面倾斜摆动。仅影响纸娃娃渲染。",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw": "同步乘客身体朝向",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw.desc": "让世界中的龙乘客身体对齐所骑的龙载具，而不只在乘客自己的客户端上生效。仅影响世界渲染。"
 }

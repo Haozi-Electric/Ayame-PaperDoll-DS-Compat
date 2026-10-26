@@ -65,6 +65,7 @@ public class Configs {
     public final SimpleOption<Boolean> useWorldLight = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("use_world_light"), true);
     public final SimpleNumericOption<Integer> worldLightMin = new SimpleNumericOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("world_light_min"), 2, 0, 15);
     public final SimpleOption<Boolean> renderVehicle = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("render_vehicle"), true);
+    public final SimpleOption<Boolean> renderPassengers = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("render_passengers"), true);
     public final SimpleOption<Boolean> pauseGameOnConfigScreen = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("pause_game_on_config_screen"), true);
     public final SimpleOption<Boolean> disableConfigScreenBlur = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("disable_config_screen_blur"), true);
     public final SimpleOption<Boolean> visibleDuringActivity = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("visible_during_activity"), false);
@@ -73,7 +74,9 @@ public class Configs {
     public final SimpleOption<Boolean> spectatorAutoSwitch = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("spectator_auto_switch"), true);
     public final SimpleOption<String> playerName = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("player_name"), "");
     public final SimpleOption<Boolean> autoScaleDragonToHumanHeight = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_scale_dragon_to_human_height"), true);
+    public final SimpleOption<Boolean> autoFitRidingChain = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_fit_riding_chain"), false);
     public final SimpleOption<Boolean> dsGlideWobble = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("ds_glide_wobble"), false);
+    public final SimpleOption<Boolean> syncPassengerBodyYaw = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("sync_passenger_body_yaw"), true);
     public final SimpleOption<Integer> lastConfigTabIdx = new SimpleOption<>(HIDDEN_CATEGORY, AyamePaperDoll.path("last_config_tab_idx"), 0);
     public final SimpleOption<Boolean> debugMode = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_mode"), false);
     public final SimpleOption<Boolean> debugLogCullFace = new SimpleOption<>(DEBUG_CATEGORY, AyamePaperDoll.path("debug_log_cull_face"), false);

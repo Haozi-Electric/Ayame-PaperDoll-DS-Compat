@@ -60,7 +60,7 @@
   "config.ayame_paperdoll.option.sneak_offset_y": "Sneaking Y Offset",
   "config.ayame_paperdoll.option.swim_crawl_offset_y": "Swimming/Crawling Y Offset",
   "config.ayame_paperdoll.option.elytra_offset_y": "Elytra Y Offset",
-  "config.ayame_paperdoll.option.pose_offset_method.desc": "Method of offsetting player's position when the player changes its pose.\n\n§eAuto§r: Adjust height according to the height of entity's eyes.\n§eManual§r: Manually set the offset when sneaking, swimming, using elytra and crawling.\n§eForce Standing§r: Only renders in standing pose.\n§eDisabled§r: No offset.",
+  "config.ayame_paperdoll.option.pose_offset_method.desc": "Method of offsetting player's position when the player changes its pose.\n\n§eAuto§r: Adjust height according to the height of entity's eyes.\n§eManual§r: Manually set the offset when sneaking, swimming, using elytra and crawling.\n§eForce Standing§r: Only renders in standing pose.\n§eDisabled§r: No offset.\n\n§7DragonSurvival dragons ignore this option; their pose is handled by the mod itself.§r",
   "config.ayame_paperdoll.option.sneak_offset_y.desc": "Y offset when player is sneaking.\n\nWorks only when §aPosture Offset Method§r is set to §eManual§r.",
   "config.ayame_paperdoll.option.swim_crawl_offset_y.desc": "Y offset when player is swimming or crawling.\n\nWorks only when §aPosture Offset Method§r is set to §eManual§r.",
   "config.ayame_paperdoll.option.elytra_offset_y.desc": "Y offset when player is flying using an elytra.\n\nWorks only when §aPosture Offset Method§r is set to §eManual§r.",
@@ -71,6 +71,7 @@
   "config.ayame_paperdoll.option.use_world_light": "Use World Light",
   "config.ayame_paperdoll.option.world_light_min": "Min World Light",
   "config.ayame_paperdoll.option.render_vehicle": "Render Vehicle",
+  "config.ayame_paperdoll.option.render_passengers": "Render Passengers",
   "config.ayame_paperdoll.option.pause_game_on_config_screen": "Pause Game when Configuring",
   "config.ayame_paperdoll.option.disable_config_screen_blur": "Disable Background Blur",
   "config.ayame_paperdoll.option.visible_during_activity": "Visible During Activity",
@@ -84,6 +85,7 @@
   "config.ayame_paperdoll.option.use_world_light.desc": "If use the light level in the world to render.",
   "config.ayame_paperdoll.option.world_light_min.desc": "Minimum brightness when useWorldLight is enabled.",
   "config.ayame_paperdoll.option.render_vehicle.desc": "Render the vehicle, does not work when §aPosture Offset Method§r is §eForce Standing§r.",
+  "config.ayame_paperdoll.option.render_passengers.desc": "Render the passengers and riding chain on you. ",
   "config.ayame_paperdoll.option.pause_game_on_config_screen.desc": "Whether to pause the game when the configuration screen is open. (effective in single-player only)",
   "config.ayame_paperdoll.option.disable_config_screen_blur.desc": "Controls whether the background blur effect is displayed on the in-game configuration screen.",
   "config.ayame_paperdoll.option.visible_during_activity.desc": "Whether to display only during sprinting, jumping, flying, sitting, swimming, crawling, or flying with elytra.",
@@ -103,6 +105,10 @@
   "config.ayame_paperdoll.option.debug_force_disable_culling.desc": "Force-disable face culling instead of flipping it in mirror mode.\nIf mirror mode works with this on, the flip-cull logic is being overridden.\n§cWarning: causes DS dragon wing z-fighting. Diagnostic only!",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "Auto Scale Dragon to Human Height",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "Scales a dragon whose model grew beyond human height back to human height in the paper doll, so it doesn't overflow the screen. Only affects the paper doll rendering.",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain": "Auto Fit Riding Chain",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain.desc": "Scales the whole riding chain (mount and passengers) down when it would extend past the screen. Only affects the paper doll. Disable to use the configured size unchanged.",
   "config.ayame_paperdoll.option.ds_glide_wobble": "Glide Wobble",
-  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "Lets the paper doll dragon pitch down and bank side to side while gliding, just like the dragon in the world. Only affects the paper doll rendering."
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "Lets the paper doll dragon pitch down and bank side to side while gliding, just like the dragon in the world. Only affects the paper doll rendering.",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw": "Sync Passenger Body Yaw",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw.desc": "Align a dragon passenger's body with its dragon mount in the world, not just on the passenger's own client. Only affects world rendering."
 }

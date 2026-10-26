@@ -45,7 +45,7 @@ subprojects {
     apply plugin: 'maven-publish'
 
     base {
-        // Set up a suffixed format for the mod jar names, e.g. `example-fabric`.
+        // Set up a suffixed format for the mod jar names, e.g. `example-neoforge`.
         archivesName = "$rootProject.mod_archives_name-$project.name"
     }
 
@@ -60,11 +60,6 @@ subprojects {
         maven {
             name = 'ParchmentMC'
             url = 'https://maven.parchmentmc.org'
-        }
-        // Fabric Mod Menu
-        maven {
-            name = "Terraformers"
-            url = "https://maven.terraformersmc.com/"
         }
     }
 

@@ -96,8 +96,12 @@ public class GsonConfigPersistence implements ConfigPersistence {
             while (reader.peek() == JsonToken.NAME) {
                 var categoryName = reader.nextName();
                 var category = categories.get(ResourceLocation.parse(categoryName));
-                if (category == null)
-                    throw new IllegalStateException("The category with key " + categoryName + "does not exist");
+                if (category == null) {
+                    // Options can move between categories or be removed between versions.
+                    AyamePaperDoll.LOGGER.warn("Ignoring unknown config category {}", categoryName);
+                    reader.skipValue();
+                    continue;
+                }
 
                 reader.beginObject();
 
@@ -105,8 +109,12 @@ public class GsonConfigPersistence implements ConfigPersistence {
                 while (reader.peek() == JsonToken.NAME) {
                     var optionName = reader.nextName();
                     var option = category.get(ResourceLocation.parse(optionName));
-                    if (option == null)
-                        throw new IllegalStateException("The option with key " + optionName + " in category " + categoryName + " does not exist");
+                    if (option == null) {
+                        // Keep the rest of the file loadable when an option was moved or removed.
+                        AyamePaperDoll.LOGGER.warn("Ignoring unknown config option {} in category {}", optionName, categoryName);
+                        reader.skipValue();
+                        continue;
+                    }
 
                     if (option.getType().isAssignableFrom(Integer.class))
                         //noinspection unchecked

@@ -43,6 +43,9 @@ public final class AyameDSCompatMod {
         // dragon's current visual scale (player SCALE attribute, human = 1.0) and normalizes it
         // back to human height so oversized dragons don't overflow the paper doll. Non-dragons
         // and players without a dragon entity yet are left untouched (factor 1.0).
+        AyameDSCompat.setDragonQuery(DragonStateProvider::isDragon);
+        AyameDSCompat.setCarriedPassengerQuery(CarryOnCompat::isCarriedPlayer);
+
         AyameDSCompat.setDragonScaleProvider(entity -> {
             if (!(entity instanceof Player player) || !DragonStateProvider.isDragon(player)) {
                 return 1.0f;

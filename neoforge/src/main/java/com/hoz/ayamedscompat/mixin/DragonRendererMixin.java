@@ -23,6 +23,7 @@
 package com.hoz.ayamedscompat.mixin;
 
 import by.dragonsurvivalteam.dragonsurvival.client.render.entity.dragon.DragonRenderer;
+import by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvider;
 import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
 import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
 import by.dragonsurvivalteam.dragonsurvival.server.handlers.ServerFlightHandler;
@@ -31,8 +32,14 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.object.GeoBone;
+import software.bernie.geckolib.util.RenderUtil;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -46,16 +53,21 @@ public abstract class DragonRendererMixin {
     @Unique
     private double ayamedscompat$savedBodyYaw;
     @Unique
+    private double ayamedscompat$savedBodyYawLastFrame;
+    @Unique
     private float ayamedscompat$savedPrevXRot;
     @Unique
     private float ayamedscompat$savedPrevZRot;
     @Unique
     private boolean ayamedscompat$needsRestore;
+    @Unique
+    private boolean ayamedscompat$savedFlightRotations;
+    @Unique
+    private boolean ayamedscompat$savedInInventory;
+    @Unique
+    private boolean ayamedscompat$restoreInInventory;
 
-    // In-world, DragonRenderer offsets the model from the entity by an amount derived from the
-    // live MovementData bodyYaw and the dragon's size. In the paper doll that live offset makes
-    // the model orbit the preview origin when the view rotates, so we zero it during compat
-    // rendering and let the paper doll's own translation center the model.
+    // Zero the live model offset in the paper doll; otherwise the model orbits the preview origin.
     @Inject(method = "getModelOffset", at = @At("HEAD"), cancellable = true, remap = false)
     private void ayamedscompat$centerModel(final DragonEntity dragon, final float partialTicks,
                                            final CallbackInfoReturnable<Vec3> cir) {
@@ -64,19 +76,25 @@ public abstract class DragonRendererMixin {
         }
     }
 
-    // Anchor the dragon's body yaw to the paper doll's locked pose (player.yBodyRot) so the
-    // body faces the camera. This only affects the rotation applied inside setupRender; it is
-    // restored at RETURN so the animation (applyMolangQueries, which runs afterwards) still
-    // sees the real world bodyYaw and the tail keeps its natural swing.
+    // World: align a dragon passenger's body to the root mount (DS only does this on the
+    // passenger's own client). Paper doll: face the doll's locked pose. Restored at RETURN so
+    // the animation still sees the real world values.
     @Inject(method = "setupRender", at = @At("HEAD"), remap = false)
     private void ayamedscompat$overrideBodyYaw(final DragonEntity dragon, final Player player,
                                                final PoseStack pose, final float partialTick,
                                                final CallbackInfo ci) {
-        if (!AyameDSCompat.isRenderingForCompat() || player == null) {
+        if (player == null) {
+            return;
+        }
+        if (!AyameDSCompat.isRenderingForCompat()) {
+            if (AyamePaperDoll.CONFIGS.syncPassengerBodyYaw.getValue()) {
+                ayamedscompat$syncPassengerBodyYaw(player);
+            }
             return;
         }
         final MovementData movement = MovementData.getData(player);
         ayamedscompat$savedBodyYaw = movement.bodyYaw;
+        ayamedscompat$savedBodyYawLastFrame = movement.bodyYawLastFrame;
         movement.bodyYaw = player.yBodyRot;
         // Newer DS wings the glide condition off dragon.prevXRot/prevZRot as well. When the
         // wobble is disabled, zero them so the release condition (isGliding forced false below
@@ -86,6 +104,7 @@ public abstract class DragonRendererMixin {
             ayamedscompat$savedPrevZRot = dragon.prevZRot;
             dragon.prevXRot = 0;
             dragon.prevZRot = 0;
+            ayamedscompat$savedFlightRotations = true;
         }
         ayamedscompat$needsRestore = true;
     }
@@ -97,12 +116,122 @@ public abstract class DragonRendererMixin {
         if (!ayamedscompat$needsRestore || player == null) {
             return;
         }
-        MovementData.getData(player).bodyYaw = ayamedscompat$savedBodyYaw;
-        if (!AyamePaperDoll.CONFIGS.dsGlideWobble.getValue()) {
+        final MovementData movement = MovementData.getData(player);
+        movement.bodyYaw = ayamedscompat$savedBodyYaw;
+        movement.bodyYawLastFrame = ayamedscompat$savedBodyYawLastFrame;
+        if (ayamedscompat$savedFlightRotations) {
             dragon.prevXRot = ayamedscompat$savedPrevXRot;
             dragon.prevZRot = ayamedscompat$savedPrevZRot;
+            ayamedscompat$savedFlightRotations = false;
         }
         ayamedscompat$needsRestore = false;
+    }
+
+    @Unique
+    private void ayamedscompat$syncPassengerBodyYaw(final Player player) {
+        if (ayamedscompat$needsRestore || !player.isPassenger()) {
+            return;
+        }
+        if (!(player.getVehicle() instanceof Player vehicle) || !DragonStateProvider.isDragon(vehicle)) {
+            return;
+        }
+        // Intermediate alignment is temporary; a deeper passenger must use the root's bodyYaw.
+        Player root = vehicle;
+        while (root.getVehicle() instanceof Player parent && DragonStateProvider.isDragon(parent)) {
+            root = parent;
+        }
+        final MovementData movement = MovementData.getData(player);
+        final MovementData rootMovement = MovementData.getData(root);
+        ayamedscompat$savedBodyYaw = movement.bodyYaw;
+        ayamedscompat$savedBodyYawLastFrame = movement.bodyYawLastFrame;
+        final double yaw = rootMovement.bodyYawLastFrame;
+        movement.bodyYaw = yaw;
+        movement.bodyYawLastFrame = yaw;
+        ayamedscompat$needsRestore = true;
+    }
+
+    // Paper-doll bone poses live in HUD space. Skip DS's shared bone-cache write during compat
+    // so the real MountingBone/seat data is not corrupted.
+    @Inject(method = "postRender(Lcom/mojang/blaze3d/vertex/PoseStack;"
+                         + "Lby/dragonsurvivalteam/dragonsurvival/common/entity/DragonEntity;"
+                         + "Lsoftware/bernie/geckolib/cache/object/BakedGeoModel;"
+                         + "Lnet/minecraft/client/renderer/MultiBufferSource;"
+                         + "Lcom/mojang/blaze3d/vertex/VertexConsumer;ZFIII)V",
+            at = @At("HEAD"), remap = false, require = 1)
+    private void ayamedscompat$skipPreviewBoneCache(final PoseStack pose, final DragonEntity dragon,
+                                                    final BakedGeoModel model, final MultiBufferSource buffers,
+                                                    final VertexConsumer buffer, final boolean isReRender,
+                                                    final float partialTick, final int packedLight,
+                                                    final int packedOverlay, final int color,
+                                                    final CallbackInfo ci) {
+        if (AyameDSCompat.isRenderingForCompat()) {
+            ayamedscompat$savedInInventory = dragon.isInInventory;
+            dragon.isInInventory = true;
+            ayamedscompat$restoreInInventory = true;
+        }
+    }
+
+    @Inject(method = "postRender(Lcom/mojang/blaze3d/vertex/PoseStack;"
+                         + "Lby/dragonsurvivalteam/dragonsurvival/common/entity/DragonEntity;"
+                         + "Lsoftware/bernie/geckolib/cache/object/BakedGeoModel;"
+                         + "Lnet/minecraft/client/renderer/MultiBufferSource;"
+                         + "Lcom/mojang/blaze3d/vertex/VertexConsumer;ZFIII)V",
+            at = @At("RETURN"), remap = false, require = 1)
+    private void ayamedscompat$restoreBoneCacheGuard(final PoseStack pose, final DragonEntity dragon,
+                                                     final BakedGeoModel model, final MultiBufferSource buffers,
+                                                     final VertexConsumer buffer, final boolean isReRender,
+                                                     final float partialTick, final int packedLight,
+                                                     final int packedOverlay, final int color,
+                                                     final CallbackInfo ci) {
+        if (ayamedscompat$restoreInInventory) {
+            dragon.isInInventory = ayamedscompat$savedInInventory;
+            ayamedscompat$restoreInInventory = false;
+        }
+    }
+
+    // The rider is already placed with the captured MountingBone transform; suppress DS's
+    // world-space correction during the paper-doll render.
+    @Inject(method = "getMountingBonePositionCorrection(Lnet/minecraft/world/entity/player/Player;F)Lnet/minecraft/world/phys/Vec3;",
+            at = @At("HEAD"), cancellable = true, require = 0, remap = false)
+    private static void ayamedscompat$suppressWorldSeatCorrection(final Player rider, final float partialTick,
+                                                                  final CallbackInfoReturnable<Vec3> cir) {
+        if (AyameDSCompat.isRenderingForCompat()) {
+            cir.setReturnValue(null);
+        }
+    }
+
+    // Capture the MountingBone pose relative to the paper-doll node base.
+    @Inject(method = "renderRecursively(Lcom/mojang/blaze3d/vertex/PoseStack;"
+                         + "Lby/dragonsurvivalteam/dragonsurvival/common/entity/DragonEntity;"
+                         + "Lsoftware/bernie/geckolib/cache/object/GeoBone;"
+                         + "Lnet/minecraft/client/renderer/RenderType;"
+                         + "Lnet/minecraft/client/renderer/MultiBufferSource;"
+                         + "Lcom/mojang/blaze3d/vertex/VertexConsumer;ZFIII)V",
+            at = @At("HEAD"), remap = false, require = 1)
+    private void ayamedscompat$captureMountingBone(final PoseStack poseStack, final DragonEntity dragon,
+                                                   final GeoBone bone, final RenderType renderType,
+                                                   final MultiBufferSource bufferSource,
+                                                   final VertexConsumer buffer, final boolean isReRender,
+                                                   final float partialTick, final int packedLight,
+                                                   final int packedOverlay, final int color,
+                                                   final CallbackInfo ci) {
+        // Literal: the compile-time DS jar does not expose DragonRidingHandler.MOUNTING_BONE.
+        if (!AyameDSCompat.isSeatCaptureActive() || !"MountingBone".equals(bone.getName())) {
+            return;
+        }
+        final Player player = dragon.getPlayer();
+        if (player == null || !AyameDSCompat.isSeatCaptureTarget(player)) {
+            return;
+        }
+        final PoseStack bonePose = new PoseStack();
+        bonePose.last().pose().set(poseStack.last().pose());
+        // Match GeoEntityRenderer's tracked matrix: stop before translateAwayFromPivotPoint.
+        // prepMatrixForBone includes the translate-away and cancels the pivot translation.
+        RenderUtil.translateMatrixToBone(bonePose, bone);
+        RenderUtil.translateToPivotPoint(bonePose, bone);
+        RenderUtil.rotateMatrixAroundBone(bonePose, bone);
+        RenderUtil.scaleMatrixForBone(bonePose, bone);
+        AyameDSCompat.captureSeatMatrix(bonePose.last().pose());
     }
 
     // During compat, suppress the gliding pitch/roll applied in setupRender so the paper doll
