@@ -17,4 +17,5 @@ build/*
 /remappedSrc/
 /.idea/
 !/.idea/copyright/
+/local.properties
 /*/.architectury-transformer/

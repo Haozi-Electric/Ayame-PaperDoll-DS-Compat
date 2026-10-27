@@ -18,6 +18,8 @@
  *     along with Ayame PaperDoll.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import java.util.Properties
+
 plugins {
     id("com.gradleup.shadow") version "9.2.2"
 }
@@ -56,17 +58,27 @@ repositories {
     }
 }
 
+// DragonSurvival + GeckoLib for the DS compat hook (client-only, not bundled).
+// The jar folder is machine-specific, so it is read from the untracked local.properties
+// (ds_mods_dir=...) or the DS_MODS_DIR environment variable.
+val dsModsDir: String = run {
+    val localProperties = Properties()
+    val localFile = rootProject.file("local.properties")
+    if (localFile.isFile) {
+        localFile.reader(Charsets.UTF_8).use { localProperties.load(it) }
+    }
+    localProperties.getProperty("ds_mods_dir")
+        ?: System.getenv("DS_MODS_DIR")
+        ?: error("Set ds_mods_dir in local.properties (or DS_MODS_DIR) to the mods folder containing the DragonSurvival and GeckoLib jars.")
+}
+
 dependencies {
     add("neoForge", "net.neoforged:neoforge:${rootProject.extra["neoforge_version"]}")
 
     common(project(path = ":common")) { isTransitive = false }
 
-    // DragonSurvival + GeckoLib for the DS compat hook (client-only, not bundled).
-    // Resolved from the 26.1.2 test client's mods folder; replace with a proper maven
-    // coordinate when a stable one is available.
-    val testClientMods = "D:/Programs/MCPCL2/.minecraft/versions/26.1.2-NeoForge_测试客户端/mods"
-    implementation(fileTree(testClientMods) { include("**/*DragonSurvival*.jar") })
-    compileOnly(fileTree(testClientMods) { include("**/*geckolib*.jar") })
+    implementation(fileTree(dsModsDir) { include("**/*DragonSurvival*.jar") })
+    compileOnly(fileTree(dsModsDir) { include("**/*geckolib*.jar") })
 
     shadowBundle(
         project(
