@@ -26,7 +26,6 @@ chmod +x gradlew
 
 ./gradlew build
 mkdir result
-cp -r fabric/build/libs/* result
 cp -r neoforge/build/libs/* result
 cp -r common/build/libs/* result
 cd result

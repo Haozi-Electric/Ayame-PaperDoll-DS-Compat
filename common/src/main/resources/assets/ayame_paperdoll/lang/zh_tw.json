@@ -90,5 +90,19 @@
   "config.ayame_paperdoll.option.hide_under_debug.desc": "是否在 F3 開啟的除錯畫面下隱藏",
   "config.ayame_paperdoll.option.hide_on_screen_open.desc": "是否在介面開啟（例如遊戲選單或背包）時隱藏",
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "旁觀者模式下自動切換實體模型\n\n開啟後會覆蓋§2渲染玩家名稱§r的功能",
-  "config.ayame_paperdoll.option.player_name.desc": "被渲染實體的玩家名稱，空白代表你自己的名稱"
+  "config.ayame_paperdoll.option.player_name.desc": "被渲染實體的玩家名稱，空白代表你自己的名稱",
+  "config.ayame_paperdoll.category.ds_compat": "龍之生存相容",
+  "config.ayame_paperdoll.category.debug": "除錯",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "自動縮放龍到人類高度",
+  "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "將長大超過人類身高的龍模型在紙娃娃中自動縮放到人類高度，避免超出畫面。僅影響紙娃娃渲染。",
+  "config.ayame_paperdoll.option.render_passengers": "渲染乘客",
+  "config.ayame_paperdoll.option.render_passengers.desc": "渲染騎在你身上的乘客與整條騎乘鏈。適用於龍之生存的騎乘系統。",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain": "自動適配騎乘鏈",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain.desc": "當載具和乘客疊成的整條騎乘鏈會超出畫面時，按比例縮小整組模型，保證全部可見。僅影響紙娃娃；關閉後完全使用設定的尺寸。",
+  "config.ayame_paperdoll.option.ds_glide_wobble": "滑翔擺動",
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "滑翔時紙娃娃龍會像世界中的龍一樣俯衝低頭並向側面傾斜擺動。僅影響紙娃娃渲染。",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw": "同步乘客身體朝向",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw.desc": "讓世界中的龍乘客身體對齊所騎的龍載具，而不只在乘客自己的客戶端上生效。僅影響世界渲染。",
+  "config.ayame_paperdoll.option.debug_mode": "除錯模式",
+  "config.ayame_paperdoll.option.debug_mode.desc": "除錯模式總開關。所有除錯功能僅在開啟時生效。\n\n§c警告：開啟後會在日誌中輸出大量資訊，可能影響效能。"
 }

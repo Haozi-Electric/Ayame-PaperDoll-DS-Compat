@@ -30,24 +30,34 @@ import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityAttachment;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.phys.Vec3;
 import com.hoz.ayamedscompat.AyameDSCompat;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
 import org.ayamemc.ayamepaperdoll.hud.DataBackup.DataBackupEntry;
+import org.ayamemc.ayamepaperdoll.hud.ModRenderState.ChainChild;
+import org.ayamemc.ayamepaperdoll.hud.ModRenderState.ChainNode;
 import org.ayamemc.ayamepaperdoll.mixininterface.GuiGraphicsExtractorInterface;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.ayamemc.ayamepaperdoll.AyamePaperDoll.CONFIGS;
 
@@ -79,6 +89,7 @@ public class PaperDollRenderer {
             new DataBackupEntry<>(e -> e.getSharedFlag(0), (e, flag) -> e.setSharedFlag(0, flag)) // on fire
     );
     private static final PaperDollRenderer instance = new PaperDollRenderer();
+    private static long lastChainFitLogNanos;
     private final Minecraft minecraft = Minecraft.getInstance();
 
     private PaperDollRenderer() {
@@ -134,6 +145,12 @@ public class PaperDollRenderer {
 
         Configs.PoseOffsetMethod poseOffsetMethod = CONFIGS.poseOffsetMethod.getValue();
 
+        List<LivingEntity> ridingChain = buildRidingChain(targetEntity, poseOffsetMethod);
+        if (ridingChain != null) {
+            extractRidingChain(graphics, ridingChain, targetEntity, poseOffsetMethod, a);
+            return;
+        }
+
         var backup = new DataBackup<>(targetEntity, LIVINGENTITY_BACKUP_ENTRIES);
         backup.save();
 
@@ -176,7 +193,215 @@ public class PaperDollRenderer {
         backup.restore();
     }
 
+    /** Returns the rendered riding chain, or null for the legacy target/vehicle path. */
+    private List<LivingEntity> buildRidingChain(LivingEntity target, Configs.PoseOffsetMethod poseOffsetMethod) {
+        if (poseOffsetMethod == Configs.PoseOffsetMethod.FORCE_STANDING) {
+            return null;
+        }
+
+        final boolean includeVehicle = CONFIGS.renderVehicle.getValue() && target.isPassenger();
+        final boolean includePassengers = CONFIGS.renderPassengers.getValue();
+        if (!includeVehicle && !includePassengers) {
+            return null;
+        }
+
+        List<LivingEntity> chain = new ArrayList<>();
+
+        if (includeVehicle) {
+            List<LivingEntity> ancestors = new ArrayList<>();
+            for (Entity entity = target; entity != null; entity = entity.getVehicle()) {
+                if (!(entity instanceof LivingEntity living)) {
+                    return null; // non-living mounts keep the legacy path
+                }
+                ancestors.add(living);
+            }
+            Collections.reverse(ancestors);
+            // Every mount needs a dragon seat anchor.
+            for (int i = 0; i < ancestors.size() - 1; i++) {
+                if (!AyameDSCompat.isDragon(ancestors.get(i))) {
+                    return null;
+                }
+            }
+            chain.addAll(ancestors);
+        } else {
+            chain.add(target);
+        }
+
+        if (includePassengers) {
+            collectRenderedPassengers(target, chain);
+        }
+
+        return chain.size() > 1 ? chain : null;
+    }
+
+    private void collectRenderedPassengers(LivingEntity mount, List<LivingEntity> chain) {
+        for (Entity passenger : mount.getPassengers()) {
+            if (!(passenger instanceof LivingEntity living)) {
+                continue;
+            }
+            // CarryOn carried players bypass the MountingBone with their own front-carry offset.
+            if (!AyameDSCompat.isDragon(mount) && !AyameDSCompat.isCarriedPassenger(mount, living)) {
+                continue;
+            }
+            chain.add(living);
+            collectRenderedPassengers(living, chain);
+        }
+    }
+
+    // Seat transforms are captured at render time (bones do not exist yet), so this only stores
+    // the pivots/fallbacks and the node hierarchy in one PiP state.
+    private void extractRidingChain(GuiGraphicsExtractor graphics, List<LivingEntity> chain,
+                                    LivingEntity targetEntity, Configs.PoseOffsetMethod poseOffsetMethod,
+                                    float partialTicks) {
+        final LivingEntity root = chain.get(0);
+        List<DataBackup<LivingEntity>> backups = new ArrayList<>(chain.size());
+        for (LivingEntity entity : chain) {
+            backups.add(new DataBackup<>(entity, LIVINGENTITY_BACKUP_ENTRIES));
+        }
+
+        try {
+            for (DataBackup<LivingEntity> backup : backups) {
+                backup.save();
+            }
+            for (LivingEntity entity : chain) {
+                transformEntity(entity, partialTicks, false);
+            }
+
+            Map<LivingEntity, List<LivingEntity>> renderedChildren = buildRenderedChildren(chain);
+
+            Map<LivingEntity, EntityRenderState> states = new IdentityHashMap<>();
+            for (LivingEntity entity : chain) {
+                // groupScale handles auto-scale for the whole chain. Chain children drop their
+                // own glide tilt because the MountingBone seat already carries the mount's tilt.
+                states.put(entity, extractRenderState(entity, partialTicks, false, entity != root));
+            }
+
+            float groupScale = 1.0f;
+            if (CONFIGS.autoScaleDragonToHumanHeight.getValue()
+                    && AyameDSCompat.isDragon(root)
+                    && states.get(root) instanceof LivingEntityRenderState livingRoot
+                    && livingRoot.scale > 0.001f) {
+                groupScale = 1.0f / livingRoot.scale;
+            }
+            float fitScale = getChainFitScale(chain, root, groupScale);
+            if (fitScale != 1.0f && CONFIGS.debugMode.getValue()) {
+                long now = System.nanoTime();
+                if (now - lastChainFitLogNanos > 1_000_000_000L) {
+                    lastChainFitLogNanos = now;
+                    org.ayamemc.ayamepaperdoll.AyamePaperDoll.LOGGER.info(
+                            "[Debug] auto-fit riding chain: nodes={}, fit={}", chain.size(), fitScale);
+                }
+            }
+
+            Map<LivingEntity, ChainNode> nodes = new IdentityHashMap<>();
+            ChainNode rootNode = buildChainNode(root, root, targetEntity, states, renderedChildren, nodes,
+                    poseOffsetMethod, partialTicks);
+
+            extractPaperdoll(graphics,
+                    rootNode.renderState(),
+                    new Vector3f(0, 0, 0),
+                    null,
+                    null,
+                    rootNode,
+                    groupScale,
+                    fitScale);
+        } finally {
+            for (int i = backups.size() - 1; i >= 0; i--) {
+                backups.get(i).restore();
+            }
+        }
+    }
+
+    private Map<LivingEntity, List<LivingEntity>> buildRenderedChildren(List<LivingEntity> chain) {
+        Set<LivingEntity> included = Collections.newSetFromMap(new IdentityHashMap<>());
+        included.addAll(chain);
+        Map<LivingEntity, List<LivingEntity>> children = new IdentityHashMap<>();
+        for (LivingEntity entity : chain) {
+            if (entity.getVehicle() instanceof LivingEntity mount && included.contains(mount)) {
+                children.computeIfAbsent(mount, key -> new ArrayList<>(1)).add(entity);
+            }
+        }
+        return children;
+    }
+
+    private ChainNode buildChainNode(LivingEntity entity, LivingEntity root, LivingEntity targetEntity,
+                                     Map<LivingEntity, EntityRenderState> states,
+                                     Map<LivingEntity, List<LivingEntity>> renderedChildren,
+                                     Map<LivingEntity, ChainNode> nodes,
+                                     Configs.PoseOffsetMethod poseOffsetMethod, float partialTicks) {
+        ChainNode cached = nodes.get(entity);
+        if (cached != null) {
+            return cached;
+        }
+
+        List<LivingEntity> children = renderedChildren.getOrDefault(entity, List.of());
+        List<ChainChild> childNodes = new ArrayList<>(children.size());
+        for (LivingEntity child : children) {
+            int index = Math.max(0, entity.getPassengers().indexOf(child));
+            Vec3 pivot = child.getVehicleAttachmentPoint(entity);
+            Vec3 fallback = entity.getDimensions(entity.getPose()).attachments()
+                    .getClamped(EntityAttachment.PASSENGER, index, entity.getYRot());
+
+            Vec3 carryOnOffset = null;
+            if (!AyameDSCompat.isDragon(entity) && AyameDSCompat.isCarriedPassenger(entity, child)) {
+                carryOnOffset = new Vec3(0.0, 0.4, 0.6)
+                        .yRot((float) Math.toRadians(-entity.yBodyRot));
+            }
+
+            ChainNode childNode = buildChainNode(child, root, targetEntity, states, renderedChildren, nodes,
+                    poseOffsetMethod, partialTicks);
+            childNodes.add(new ChainChild(
+                    childNode,
+                    index,
+                    pivot.toVector3f(),
+                    fallback.toVector3f(),
+                    carryOnOffset == null ? null : carryOnOffset.toVector3f()
+            ));
+        }
+
+        // Pose-offset only applies to the chain origin; a riding target is placed by the seat.
+        Vector3f translation = new Vector3f();
+        if (entity == targetEntity && entity == root) {
+            translation.y = (float) getPoseOffsetY(entity, partialTicks, poseOffsetMethod);
+        }
+
+        ChainNode node = new ChainNode(
+                states.get(entity),
+                AyameDSCompat.isDragon(entity),
+                translation,
+                List.copyOf(childNodes),
+                entity.getName().getString()
+        );
+        nodes.put(entity, node);
+        return node;
+    }
+
+    /** Conservative screen-fit scale for a multi-node chain; 1.0 when it fits. */
+    private static float getChainFitScale(List<LivingEntity> chain, LivingEntity root, float groupScale) {
+        if (!CONFIGS.autoFitRidingChain.getValue() || chain.size() <= 1) {
+            return 1.0f;
+        }
+
+        float rootHeight = Math.max(1.0f, root.getDimensions(root.getPose()).height() * groupScale);
+        float chainHeight = rootHeight + (chain.size() - 1) * Math.max(1.0f, rootHeight * 0.7f);
+        double size = CONFIGS.size.getValue();
+        double anchor = CONFIGS.offsetY.getValue();
+        // The doll grows upward from the anchor. Presets with the anchor below the screen can use
+        // almost the whole screen height; top-corner presets only have the space above the anchor.
+        float available = anchor >= 1.0 ? 0.95f : (float) Math.max(0.06, Math.min(0.95, anchor - 0.05));
+        float needed = (float) (chainHeight * size);
+        if (needed <= available) {
+            return 1.0f;
+        }
+        return Math.max(0.15f, available / needed);
+    }
+
     private double getPoseOffsetY(LivingEntity targetEntity, float partialTicks, Configs.PoseOffsetMethod poseOffsetMethod) {
+        // These humanoid eye-height offsets would push a scaled dragon far off frame.
+        if (AyameDSCompat.isDragon(targetEntity)) {
+            return 0;
+        }
+
         if (poseOffsetMethod == Configs.PoseOffsetMethod.AUTO) {
             final float defaultPlayerEyeHeight = Player.DEFAULT_EYE_HEIGHT;
             final float defaultPlayerSwimmingBBHeight = Player.SWIMMING_BB_HEIGHT;
@@ -266,6 +491,12 @@ public class PaperDollRenderer {
 
     private void extractPaperdoll(GuiGraphicsExtractor graphics, EntityRenderState target, Vector3f offset,
                                   @Nullable EntityRenderState vehicle, @Nullable Vector3f offset2) {
+        extractPaperdoll(graphics, target, offset, vehicle, offset2, null, 1.0f, 1.0f);
+    }
+
+    private void extractPaperdoll(GuiGraphicsExtractor graphics, EntityRenderState target, Vector3f offset,
+                                  @Nullable EntityRenderState vehicle, @Nullable Vector3f offset2,
+                                  @Nullable ChainNode chain, float groupScale, float fitScale) {
         var scaledWidth = minecraft.getWindow().getGuiScaledWidth();
         var scaledHeight = minecraft.getWindow().getGuiScaledHeight();
 
@@ -294,6 +525,21 @@ public class PaperDollRenderer {
         }
 
         // different renderState, offset, pose; same rotation, pos, size
+        if (chain != null) {
+            ((GuiGraphicsExtractorInterface) graphics).addPicturesInPictureState(
+                    new ModRenderState(
+                            target,
+                            offset,
+                            pose1,
+                            chain,
+                            groupScale,
+                            fitScale,
+                            new Quaternionf(configRot).conjugate(),
+                            (int) posX, (int) posY, (float) size, null
+                    )
+            );
+            return;
+        }
         ((GuiGraphicsExtractorInterface)graphics).addPicturesInPictureState(
                 new ModRenderState(
                         target,
@@ -308,8 +554,12 @@ public class PaperDollRenderer {
         );
     }
 
+    private EntityRenderState extractRenderState(Entity targetEntity, float a) {
+        return extractRenderState(targetEntity, a, CONFIGS.autoScaleDragonToHumanHeight.getValue(), false);
+    }
+
     //also check =InventoryScreen#extractRenderState
-    private EntityRenderState extractRenderState(Entity targetEntity, float a){
+    private EntityRenderState extractRenderState(Entity targetEntity, float a, boolean autoScaleDragon, boolean chainChild) {
         // DS compat: for a dragon player, use DragonSurvival's UI render state so the paper
         // doll shows the dragon instead of the human model. The pose is the paper doll's locked
         // values (yBodyRot / head aligned / xRot); auto-scale is the config-driven toggle.
@@ -318,7 +568,7 @@ public class PaperDollRenderer {
             EntityRenderState dragonState = AyameDSCompat.createDragonUIRenderState(
                     livingEntity, a,
                     livingEntity.yBodyRot, 0.0, livingEntity.getXRot(),
-                    CONFIGS.autoScaleDragonToHumanHeight.getValue());
+                    autoScaleDragon, chainChild);
             if (dragonState != null) {
                 // DS compat active only for dragon players; gate it so normal human models
                 // are never touched by the DS rendering hooks.

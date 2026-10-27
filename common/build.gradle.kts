@@ -22,11 +22,16 @@ architectury {
     common(rootProject.property("enabled_platforms").toString().split(','))
 }
 
+repositories {
+    maven { url = uri("https://maven.fabricmc.net/") }
+    mavenCentral()
+}
+
 dependencies {
-    // We depend on Fabric Loader here to use the Fabric @Environment annotations,
-    // which get remapped to the correct annotations on each platform.
-    // Do NOT use other classes from Fabric Loader.
-    implementation("net.fabricmc:fabric-loader:${rootProject.property("fabric_loader_version")}")
+    // Compile-time only. NeoForge provides these at runtime; this is the exact Mixin
+    // and MixinExtras version on NeoForge's compile classpath.
+    compileOnly("net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7")
+    compileOnly("io.github.llamalad7:mixinextras-neoforge:0.5.4")
     //"minecraft"("com.mojang:minecraft:${rootProject.findProperty("minecraft_version")}")
 }
 loom {

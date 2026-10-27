@@ -34,6 +34,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface DragonRenderDataAccessor {
 
     @Accessor("bodyYaw")
+    double ds$getBodyYaw();
+
+    @Accessor("bodyYaw")
     void ds$setBodyYaw(double bodyYaw);
 
     @Accessor("prevXRot")

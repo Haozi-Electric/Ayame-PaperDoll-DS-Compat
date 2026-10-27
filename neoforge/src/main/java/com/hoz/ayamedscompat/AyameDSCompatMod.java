@@ -31,6 +31,7 @@ import by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvide
 import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
 import by.dragonsurvivalteam.dragonsurvival.common.handlers.DragonSizeHandler;
 import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
+import by.dragonsurvivalteam.dragonsurvival.server.handlers.ServerFlightHandler;
 import com.geckolib.renderer.base.GeoRenderState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
@@ -43,20 +44,19 @@ import net.neoforged.fml.common.Mod;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 
 /**
- * NeoForge mod registration shell.
- * The actual compat logic lives in {@link AyameDSCompat} (common module).
- * Registers the neoforge-side provider that extracts the LIVE dragon render state for
- * the paper doll: we temporarily pin MovementData to the paper doll's locked pose, call
- * EntityRenderDispatcher.extractEntity (the same live path DS uses in-world), then restore
- * MovementData. The extracted state keeps the real animation changes, so the paper doll
- * dragon walks / runs / flies / glides instead of the static createUIRenderState preview.
+ * NeoForge mod registration shell. The compat logic lives in {@link AyameDSCompat} (common);
+ * this class registers the provider that extracts the live dragon render state for the paper
+ * doll, so it keeps the real animation instead of the static UI preview.
  */
 @Mod(value = AyameDSCompatMod.MOD_ID, dist = Dist.CLIENT)
 public final class AyameDSCompatMod {
     public static final String MOD_ID = "ayame_ds_compat";
 
     public AyameDSCompatMod() {
-        AyameDSCompat.setDragonUIRenderStateProvider((entity, partialTick, bodyYaw, headYaw, headPitch, autoScale) -> {
+        AyameDSCompat.setDragonQuery(DragonStateProvider::isDragon);
+        AyameDSCompat.setCarriedPassengerQuery(CarryOnCompat::isCarriedPlayer);
+        AyameDSCompat.setCompatRenderPassEndHook(BoneCacheGuard::restoreAll);
+        AyameDSCompat.setDragonUIRenderStateProvider((entity, partialTick, bodyYaw, headYaw, headPitch, autoScale, chainChild) -> {
             if (!(entity instanceof Player player) || !DragonStateProvider.isDragon(player)) {
                 return null;
             }
@@ -69,11 +69,14 @@ public final class AyameDSCompatMod {
             boolean savedNeckLocked = dragon.neckLocked;
             dragon.neckLocked = false;
             MovementData movement = MovementData.getData(player);
-            // Replicate ClientDragonRenderer.prepareDragonRenderState so MovementData follows the
-            // real world view/flight state. We do NOT pin MovementData: the head/neck animation
-            // reads it, so it must stay world-based to behave exactly like in-world.
-            ClientDragonRenderer.setDragonMovementData(player, Minecraft.getInstance().getDeltaTracker().getRealtimeDeltaTicks());
-            ClientDragonRendererAccessor.ds$handleFlightMovement(player, dragon, movement, partialTick);
+            // DS already prepares the dragon during its world render. Preparing again here would
+            // advance body/head angles (and glide tilt) twice per frame. Only do it when the world
+            // render skipped this dragon: local player gliding in first person without
+            // first-person-flight rendering.
+            if (ayamedscompat$worldDidNotPrepareDragon(player)) {
+                ClientDragonRenderer.setDragonMovementData(player, Minecraft.getInstance().getDeltaTracker().getRealtimeDeltaTicks());
+                ClientDragonRendererAccessor.ds$handleFlightMovement(player, dragon, movement, partialTick);
+            }
             ClientDragonRendererAccessor.ds$syncDragonRenderState(player, dragon);
             try {
                 EntityRenderState renderState = Minecraft.getInstance().getEntityRenderDispatcher().extractEntity(dragon, partialTick);
@@ -86,11 +89,10 @@ public final class AyameDSCompatMod {
                         // DragonRenderData is final, so cast through Object for the mixin accessor.
                         DragonRenderDataAccessor accessor = (DragonRenderDataAccessor) (Object) renderData;
                         accessor.ds$setBodyYaw(bodyYaw);
-                        // Newer DS wings the setupRender glide release condition off
-                        // renderData.prevXRot/prevZRot as well. When glide-forward is enabled, zero
-                        // them on the render data so the paper doll body stays level; the head/neck
-                        // animation keeps reading the real MovementData so it stays natural.
-                        if (AyamePaperDoll.CONFIGS.dsGlideForward.getValue()) {
+                        // DS's setupRender also checks prevXRot/prevZRot for the glide pose. Zero
+                        // them when wobble is disabled, and for chain children: their seat already
+                        // inherits the mount's bone tilt, so their own mirrored tilt would double.
+                        if (chainChild || !AyamePaperDoll.CONFIGS.dsGlideWobble.getValue()) {
                             accessor.ds$setPrevXRot(0);
                             accessor.ds$setPrevZRot(0);
                         }
@@ -113,5 +115,13 @@ public final class AyameDSCompatMod {
                 dragon.neckLocked = savedNeckLocked;
             }
         });
+    }
+
+    /** True when the world render will not have prepared the dragon this frame. */
+    private static boolean ayamedscompat$worldDidNotPrepareDragon(final Player player) {
+        return player == Minecraft.getInstance().player
+                && Minecraft.getInstance().options.getCameraType().isFirstPerson()
+                && ServerFlightHandler.isGliding(player)
+                && !ClientDragonRenderer.renderFirstPersonFlight;
     }
 }

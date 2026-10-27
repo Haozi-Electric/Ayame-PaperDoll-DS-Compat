@@ -43,6 +43,8 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import com.hoz.ayamedscompat.AyameDSCompat;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
+import org.ayamemc.ayamepaperdoll.hud.ModRenderState.ChainChild;
+import org.ayamemc.ayamepaperdoll.hud.ModRenderState.ChainNode;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -50,6 +52,7 @@ import org.joml.Vector3f;
 import static org.ayamemc.ayamepaperdoll.AyamePaperDoll.CONFIGS;
 
 public class ModRenderer extends PictureInPictureRenderer<ModRenderState> {
+    private static long lastChainDebugLogNanos;
     private final ProjectionMatrixBuffer projectionMatrixBuffer = new ProjectionMatrixBuffer("PIP - " + this.getClass().getSimpleName());
     private final EntityRenderDispatcher entityRenderDispatcher;
     private final Projection projection = new Projection();
@@ -76,6 +79,10 @@ public class ModRenderer extends PictureInPictureRenderer<ModRenderState> {
         if (quaternionf != null) {
             camerarenderstate.orientation = quaternionf.conjugate(new Quaternionf()).rotateY((float) Math.PI);
         }
+        if (renderState.chain() != null) {
+            renderChain(renderState, poseStack, camerarenderstate, featurerenderdispatcher);
+            return;
+        }
         if(renderState.vehicleRenderState() != null){
             poseStack.pushPose();
             Vector3f vector3f = renderState.translation2();
@@ -94,10 +101,132 @@ public class ModRenderer extends PictureInPictureRenderer<ModRenderState> {
         if (dragonTarget) {
             AyameDSCompat.pushCompatRendering();
         }
-        this.entityRenderDispatcher.submit(renderState.renderState(), camerarenderstate, vector3f.x, vector3f.y, vector3f.z, poseStack, featurerenderdispatcher.getSubmitNodeStorage());
-        featurerenderdispatcher.renderAllFeatures();
-        if (dragonTarget) {
-            AyameDSCompat.popCompatRendering();
+        try {
+            this.entityRenderDispatcher.submit(renderState.renderState(), camerarenderstate, vector3f.x, vector3f.y, vector3f.z, poseStack, featurerenderdispatcher.getSubmitNodeStorage());
+            featurerenderdispatcher.renderAllFeatures();
+        } finally {
+            AyameDSCompat.afterCompatRenderPass();
+            if (dragonTarget) {
+                AyameDSCompat.popCompatRendering();
+            }
+        }
+    }
+
+    // Each node is submitted and the deferred feature pass forced, so its MountingBone can be
+    // captured before placing the children (bone matrices only exist during the model render).
+    private void renderChain(ModRenderState renderState, PoseStack poseStack,
+                             CameraRenderState camera, FeatureRenderDispatcher featureDispatcher) {
+        poseStack.pushPose();
+        try {
+            poseStack.mulPose(renderState.rotation());
+            if (renderState.groupScale() != 1.0f) {
+                poseStack.scale(renderState.groupScale(), renderState.groupScale(), renderState.groupScale());
+            }
+            if (renderState.fitScale() != 1.0f) {
+                poseStack.scale(renderState.fitScale(), renderState.fitScale(), renderState.fitScale());
+            }
+            AyameDSCompat.pushCompatRendering();
+            try {
+                renderChainNode(renderState.chain(), poseStack, camera, featureDispatcher);
+            } finally {
+                AyameDSCompat.popCompatRendering();
+            }
+        } finally {
+            poseStack.popPose();
+        }
+    }
+
+    private void renderChainNode(ChainNode node, PoseStack poseStack,
+                                 CameraRenderState camera, FeatureRenderDispatcher featureDispatcher) {
+        poseStack.pushPose();
+        try {
+            Vector3f translation = node.translation();
+            if (translation.x != 0 || translation.y != 0 || translation.z != 0) {
+                poseStack.translate(translation.x, translation.y, translation.z);
+            }
+
+            boolean captureSeat = node.dragon() && !node.children().isEmpty();
+            if (captureSeat) {
+                AyameDSCompat.beginSeatCapture(poseStack.last().pose());
+            }
+
+            AyameDSCompat.SeatTransform seat = null;
+            try {
+                this.entityRenderDispatcher.submit(node.renderState(), camera, 0.0, 0.0, 0.0,
+                        poseStack, featureDispatcher.getSubmitNodeStorage());
+                featureDispatcher.renderAllFeatures();
+                if (captureSeat) {
+                    seat = AyameDSCompat.takeSeatTransform();
+                }
+            } finally {
+                AyameDSCompat.afterCompatRenderPass();
+                if (captureSeat) {
+                    AyameDSCompat.endSeatCapture();
+                }
+            }
+
+            for (ChainChild child : node.children()) {
+                poseStack.pushPose();
+                try {
+                    if (seat != null) {
+                        // translate(seat) * rotate(bone tilt) * translate(-pivot). DS's render
+                        // correction wins over CarryOn when the mount has a MountingBone.
+                        poseStack.translate(seat.position().x, seat.position().y, seat.position().z);
+                        poseStack.mulPose(seat.tilt());
+                        Vector3f pivot = child.pivot();
+                        poseStack.translate(-pivot.x, -pivot.y, -pivot.z);
+                        logChainTransform("[Debug] chain {} -> {}: seat=({}, {}, {}), tilt=({}, {}, {}, {}), pivot=({}, {}, {})",
+                                node.label(), child.node().label(),
+                                seat.position(), seat.tilt(), child.pivot());
+                    } else if (child.carryOnOffset() != null) {
+                        // No MountingBone: CarryOn's front-carry offset is what the world shows.
+                        Vector3f carryOffset = child.carryOnOffset();
+                        poseStack.translate(carryOffset.x, carryOffset.y, carryOffset.z);
+                        logChainTransform("[Debug] chain (CarryOn) {} -> {}: offset=({}, {}, {})",
+                                node.label(), child.node().label(), carryOffset);
+                    } else {
+                        // DS fallback without a MountingBone: vanilla PASSENGER point, no tilt.
+                        Vector3f attachment = child.fallbackAttachment();
+                        poseStack.translate(attachment.x, attachment.y, attachment.z);
+                        Vector3f pivot = child.pivot();
+                        poseStack.translate(-pivot.x, -pivot.y, -pivot.z);
+                        logChainTransform("[Debug] chain (no MountingBone fallback) {} -> {}: attachment=({}, {}, {})",
+                                node.label(), child.node().label(), attachment);
+                    }
+                    renderChainNode(child.node(), poseStack, camera, featureDispatcher);
+                } finally {
+                    poseStack.popPose();
+                }
+            }
+        } finally {
+            poseStack.popPose();
+        }
+    }
+
+    private static void logChainTransform(String format, String carrier, String rider,
+                                          Vector3f position, Quaternionf tilt, Vector3f pivot) {
+        if (!CONFIGS.debugMode.getValue()) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (now - lastChainDebugLogNanos <= 1_000_000_000L) {
+            return;
+        }
+        lastChainDebugLogNanos = now;
+        AyamePaperDoll.LOGGER.info(format, carrier, rider,
+                position.x, position.y, position.z,
+                tilt.x, tilt.y, tilt.z, tilt.w,
+                pivot.x, pivot.y, pivot.z);
+    }
+
+    private static void logChainTransform(String format, String carrier, String rider, Vector3f vector) {
+        if (!CONFIGS.debugMode.getValue()) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (now - lastChainDebugLogNanos > 1_000_000_000L) {
+            lastChainDebugLogNanos = now;
+            AyamePaperDoll.LOGGER.info(format, carrier, rider, vector.x, vector.y, vector.z);
         }
     }
 

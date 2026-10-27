@@ -27,6 +27,8 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import java.util.List;
+
 public record ModRenderState(
         EntityRenderState renderState,
         Vector3f translation,
@@ -41,7 +43,10 @@ public record ModRenderState(
         int y1,
         float scale,
         @Nullable ScreenRectangle scissorArea,
-        @Nullable ScreenRectangle bounds
+        @Nullable ScreenRectangle bounds,
+        @Nullable ChainNode chain,
+        float groupScale,
+        float fitScale
 ) implements PictureInPictureRenderState {
     public ModRenderState(
             EntityRenderState renderState,
@@ -70,7 +75,65 @@ public record ModRenderState(
                 y,
                 scale,
                 scissorArea,
-                PictureInPictureRenderState.getBounds(x, y, x, y, scissorArea)
+                PictureInPictureRenderState.getBounds(x, y, x, y, scissorArea),
+                null,
+                1.0f,
+                1.0f
         );
     }
+
+    public ModRenderState(
+            EntityRenderState renderState,
+            Vector3f translation,
+            Quaternionf rotation,
+            @Nullable ChainNode chain,
+            float groupScale,
+            float fitScale,
+            @Nullable Quaternionf overrideCameraAngle,
+            int x,
+            int y,
+            float scale,
+            @Nullable ScreenRectangle scissorArea
+    ) {
+        this(
+                renderState,
+                translation,
+                rotation,
+                null,
+                null,
+                rotation,
+                overrideCameraAngle,
+                x,
+                y,
+                x,
+                y,
+                scale,
+                scissorArea,
+                PictureInPictureRenderState.getBounds(x, y, x, y, scissorArea),
+                chain,
+                groupScale,
+                fitScale
+        );
+    }
+
+    /**
+     * One node of the rendered riding chain. {@code translation} positions the node origin
+     * inside its parent's space; descendants are positioned from the parent's MountingBone.
+     */
+    public record ChainNode(
+            EntityRenderState renderState,
+            boolean dragon,
+            Vector3f translation,
+            List<ChainChild> children,
+            String label
+    ) {}
+
+    /** A rendered child edge with the placement data resolved while the entities were posed. */
+    public record ChainChild(
+            ChainNode node,
+            int passengerIndex,
+            Vector3f pivot,
+            Vector3f fallbackAttachment,
+            @Nullable Vector3f carryOnOffset
+    ) {}
 }

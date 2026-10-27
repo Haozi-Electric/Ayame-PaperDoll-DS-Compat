@@ -92,8 +92,17 @@
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "旁观者模式下自动切换实体模型\n\n打开后会覆盖§2渲染玩家名§r的功能",
   "config.ayame_paperdoll.option.player_name.desc": "被渲染实体的玩家名，空白代表你自己的名称",
   "config.ayame_paperdoll.category.ds_compat": "龙之生存兼容",
+  "config.ayame_paperdoll.category.debug": "调试",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "自动缩放龙到人类高度",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "将长大超过人类身高的龙模型在纸娃娃中自动缩放到人类高度，避免超出屏幕。仅影响纸娃娃渲染。",
-  "config.ayame_paperdoll.option.ds_glide_forward": "滑翔时龙身朝前",
-  "config.ayame_paperdoll.option.ds_glide_forward.desc": "纸娃娃中龙玩家滑翔时保持身体朝前，不左右摆动。"
+  "config.ayame_paperdoll.option.render_passengers": "渲染乘客",
+  "config.ayame_paperdoll.option.render_passengers.desc": "渲染骑在你身上的乘客与整条骑乘链。适用于龙之生存的骑乘系统。",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain": "自动适配骑乘链",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain.desc": "当载具和乘客叠成的整条骑乘链会超出屏幕时，按比例缩小整组模型，保证全部可见。仅影响纸娃娃；关闭后完全使用配置的尺寸。",
+  "config.ayame_paperdoll.option.ds_glide_wobble": "滑翔摆动",
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "滑翔时纸娃娃龙会像世界中的龙一样俯冲低头并向侧面倾斜摆动。仅影响纸娃娃渲染。",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw": "同步乘客身体朝向",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw.desc": "让世界中的龙乘客身体对齐所骑的龙载具，而不只在乘客自己的客户端上生效。仅影响世界渲染。",
+  "config.ayame_paperdoll.option.debug_mode": "调试模式",
+  "config.ayame_paperdoll.option.debug_mode.desc": "调试模式总开关。所有调试功能仅在开启时生效。\n\n§c警告：开启后会在日志中输出大量信息，可能影响性能。"
 }

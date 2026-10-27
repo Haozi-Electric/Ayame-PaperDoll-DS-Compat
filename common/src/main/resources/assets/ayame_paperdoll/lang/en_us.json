@@ -92,8 +92,17 @@
   "config.ayame_paperdoll.option.spectator_auto_switch.desc": "Automatically switch entity model in spectator mode.\n\nOverrides §2Player Name§r option if enabled.",
   "config.ayame_paperdoll.option.player_name.desc": "The name of the player to render. It will be your name when left blank.",
   "config.ayame_paperdoll.category.ds_compat": "Dragon Survival Compat",
+  "config.ayame_paperdoll.category.debug": "Debug",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height": "Auto Scale Dragon to Human Height",
   "config.ayame_paperdoll.option.auto_scale_dragon_to_human_height.desc": "Scales a dragon whose model grew beyond human height back to human height in the paper doll, so it doesn't overflow the screen. Only affects the paper doll rendering.",
-  "config.ayame_paperdoll.option.ds_glide_forward": "DS Glide Body Forward",
-  "config.ayame_paperdoll.option.ds_glide_forward.desc": "Keeps the paper doll dragon body facing forward while the dragon player glides, instead of wobbling side to side."
+  "config.ayame_paperdoll.option.render_passengers": "Render Passengers",
+  "config.ayame_paperdoll.option.render_passengers.desc": "Render the passengers and riding chain on you. Use this for the Dragon Survival riding system.",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain": "Auto Fit Riding Chain",
+  "config.ayame_paperdoll.option.auto_fit_riding_chain.desc": "Scales the whole riding chain (mount and passengers) down when it would extend past the screen. Only affects the paper doll. Disable to use the configured size unchanged.",
+  "config.ayame_paperdoll.option.ds_glide_wobble": "Glide Wobble",
+  "config.ayame_paperdoll.option.ds_glide_wobble.desc": "Lets the paper doll dragon pitch down and bank side to side while gliding, just like the dragon in the world. Only affects the paper doll rendering.",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw": "Sync Passenger Body Yaw",
+  "config.ayame_paperdoll.option.sync_passenger_body_yaw.desc": "Align a dragon passenger's body with its dragon mount in the world, not just on the passenger's own client. Only affects world rendering.",
+  "config.ayame_paperdoll.option.debug_mode": "Debug Mode",
+  "config.ayame_paperdoll.option.debug_mode.desc": "Master switch for all debug features. No debug output unless enabled.\n\n§cWarning: Enables verbose logging and may impact performance."
 }
