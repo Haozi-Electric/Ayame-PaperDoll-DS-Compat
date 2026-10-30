@@ -188,14 +188,20 @@ public class PaperDollRenderer {
         }
 
 
+        double targetPosY = CONFIGS.offsetY.getValue() * scaledHeight;
+        float targetFitScale = 1.0f;
+        Vector3f targetOffset = new Vector3f(0, (float) getPoseOffsetY(targetEntity, partialTicks, poseOffsetMethod), 0);
+        if (poseOffsetMethod == Configs.PoseOffsetMethod.AUTO && AyameDSCompat.isDragon(targetEntity)) {
+            targetFitScale = getSingleDragonFitScale(targetEntity);
+        }
         performRendering(targetEntity,
                 CONFIGS.offsetX.getValue() * scaledWidth,
-                CONFIGS.offsetY.getValue() * scaledHeight,
+                targetPosY,
                 CONFIGS.size.getValue() * scaledHeight,
                 CONFIGS.mirrored.getValue(),
-                new Vector3f(0, (float) getPoseOffsetY(targetEntity, partialTicks, poseOffsetMethod), 0),
+                targetOffset,
                 CONFIGS.lightDegree.getValue(),
-                partialTicks, guiGraphics);
+                partialTicks, guiGraphics, targetFitScale);
 
         if (vehicleBackup != null) vehicleBackup.restore();
 
@@ -287,20 +293,22 @@ public class PaperDollRenderer {
             modelViewStack.rotateY((float) Math.toRadians(CONFIGS.lightDegree.getValue() + 180));
             RenderSystem.applyModelViewMatrix();
 
-            PoseStack poseStack = new PoseStack();
-            poseStack.mulPose(Axis.YP.rotationDegrees(-CONFIGS.lightDegree.getValue().floatValue() - 180.0F));
-            poseStack.translate(CONFIGS.offsetX.getValue() * scaledWidth,
-                    CONFIGS.offsetY.getValue() * scaledHeight, 0);
-            if (mirror) {
-                poseStack.scale(-1, 1, 1);
-            }
             float size = (float) (CONFIGS.size.getValue() * scaledHeight);
-            // Normalize the root and keep every other member at its world-relative size.
+            float anchorY = (float) (CONFIGS.offsetY.getValue() * scaledHeight);
             float groupScale = 1.0f;
             if (CONFIGS.autoScaleDragonToHumanHeight.getValue()) {
                 groupScale = AyameDSCompat.getDragonScaleFactor(root);
             }
-            float fitScale = getChainFitScale(chain, root, groupScale);
+
+            float fitScale = getChainFitScale(chain, root);
+
+            PoseStack poseStack = new PoseStack();
+            poseStack.mulPose(Axis.YP.rotationDegrees(-CONFIGS.lightDegree.getValue().floatValue() - 180.0F));
+            poseStack.translate(CONFIGS.offsetX.getValue() * scaledWidth, anchorY, 0);
+            if (mirror) {
+                poseStack.scale(-1, 1, 1);
+            }
+            // Normalize the root and keep every other member at its world-relative size.
             poseStack.scale(size, size, size);
             if (groupScale != 1.0f) {
                 poseStack.scale(groupScale, groupScale, groupScale);
@@ -378,24 +386,49 @@ public class PaperDollRenderer {
         }
     }
 
-    /** Conservative screen-fit scale for a multi-node chain; 1.0 when it fits. */
-    private static float getChainFitScale(List<LivingEntity> chain, LivingEntity root, float groupScale) {
+    /** Scale-only fit for the riding chain; placement stays at the configured anchor. */
+    private static float getChainFitScale(List<LivingEntity> chain, LivingEntity root) {
         if (!CONFIGS.autoFitRidingChain.getValue() || chain.size() <= 1) {
             return 1.0f;
         }
+        return computeFitScale(getExpectedChainHeight(chain.size(), root));
+    }
 
-        float rootHeight = Math.max(1.0f, root.getDimensions(root.getPose()).height() * groupScale);
-        float chainHeight = rootHeight + (chain.size() - 1) * Math.max(1.0f, rootHeight * 0.7f);
-        double size = CONFIGS.size.getValue();
-        double anchor = CONFIGS.offsetY.getValue();
+    /** Scale-only AUTO adaptation for a single dragon; the model never moves. */
+    private static float getSingleDragonFitScale(LivingEntity dragon) {
+        return computeFitScale(getExpectedModelHeight(dragon));
+    }
+
+    private static float computeFitScale(float modelHeight) {
+        final double size = CONFIGS.size.getValue();
+        final double anchor = CONFIGS.offsetY.getValue();
         // The doll grows upward from the anchor. Presets with the anchor below the screen can use
         // almost the whole screen height; top-corner presets only have the space above the anchor.
-        float available = anchor >= 1.0 ? 0.95f : (float) Math.max(0.06, Math.min(0.95, anchor - 0.05));
-        float needed = (float) (chainHeight * size);
+        final float available = anchor >= 1.0 ? 0.95f : (float) Math.max(0.06, Math.min(0.95, anchor - 0.05));
+        final float needed = (float) (modelHeight * size);
         if (needed <= available) {
             return 1.0f;
         }
         return Math.max(0.15f, available / needed);
+    }
+
+    private static float getExpectedChainHeight(int nodes, LivingEntity root) {
+        final float rootHeight = getExpectedModelHeight(root);
+        return rootHeight + (nodes - 1) * Math.max(1.0f, rootHeight * 0.7f);
+    }
+
+    private static float getExpectedModelHeight(LivingEntity entity) {
+        final boolean dragon = AyameDSCompat.isDragon(entity);
+        if (dragon && CONFIGS.autoScaleDragonToHumanHeight.getValue()) {
+            // The DS hitbox is about twice the rendered model; the pose ratio cancels the
+            // constant factor and still follows pose changes.
+            final float standing = entity.getDimensions(Pose.STANDING).height();
+            final float current = entity.getDimensions(entity.getPose()).height();
+            final float ratio = standing > 1.0E-4f ? current / standing : 1.0f;
+            return 1.8f * Mth.clamp(ratio, 0.25f, 2.5f);
+        }
+        final float height = Math.max(1.0f, entity.getDimensions(entity.getPose()).height());
+        return dragon ? height * 0.5f : height;
     }
 
     private Map<LivingEntity, List<LivingEntity>> buildRenderedChildren(List<LivingEntity> chain) {
@@ -598,6 +631,13 @@ public class PaperDollRenderer {
     @SuppressWarnings("deprecation")
     private void performRendering(Entity targetEntity, double posX, double posY, double size, boolean mirror,
                                   Vector3f offset, double lightDegree, float partialTicks, GuiGraphics guiGraphics) {
+        performRendering(targetEntity, posX, posY, size, mirror, offset, lightDegree, partialTicks, guiGraphics, 1.0f);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void performRendering(Entity targetEntity, double posX, double posY, double size, boolean mirror,
+                                  Vector3f offset, double lightDegree, float partialTicks, GuiGraphics guiGraphics,
+                                  float fitScale) {
         EntityRenderDispatcher entityRenderDispatcher = minecraft.getEntityRenderDispatcher();
 
         Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
@@ -621,6 +661,9 @@ public class PaperDollRenderer {
             if (dragonScaleFactor != 1.0f) {
                 poseStack.scale(dragonScaleFactor, dragonScaleFactor, dragonScaleFactor);
             }
+        }
+        if (fitScale != 1.0f) {
+            poseStack.scale(fitScale, fitScale, fitScale);
         }
         Quaternionf zRot = new Quaternionf().rotateZ((float) Math.PI);
 

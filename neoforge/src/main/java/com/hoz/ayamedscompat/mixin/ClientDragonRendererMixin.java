@@ -23,6 +23,7 @@
 package com.hoz.ayamedscompat.mixin;
 
 import by.dragonsurvivalteam.dragonsurvival.client.render.ClientDragonRenderer;
+import by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvider;
 import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
 import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
 import by.dragonsurvivalteam.dragonsurvival.server.handlers.ServerFlightHandler;
@@ -31,6 +32,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
+import net.neoforged.neoforge.client.event.RenderPlayerEvent;
+import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -38,30 +41,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Renders the paper doll dragon with the SAME data the third-person render uses.
- *
- * DS's renderDragon prepares the dragon each frame (setDragonMovementData + handleFlightMovement).
- * In the paper doll (compat):
- *  - Third person: the world render already prepared the dragon this frame, so re-preparing it
- *    double-advances the angles and feeds the animation a bodyYaw that lags the view (frozen head,
- *    tail bending with the view deviation) — we skip the prepare step and use the world's data.
- *  - First-person glide: the world render deliberately skips the dragon body, so nothing was
- *    prepared this frame — we run the prepare step so the first-person paper doll shows the
- *    third-person glide dragon.
- *
- * DS version differences: the old DS calls setDragonMovementData / handleFlightMovement inside
- * renderDragon; the new flight system (v2.0.68+) moved them into prepareDragonRenderState. We
- * wrap the old call sites with require=0 (silently skipped when absent) and inject at
- * prepareDragonRenderState HEAD for the new version, keeping the mod compatible with both.
- *
- * isGliding is still forced false in the renderDragon condition so the paper doll always renders
- * the dragon; the glide pitch/roll is handled by DragonRendererMixin.setupRender.
+ * Keeps the paper doll dragon on the same preparation path as the in-world render and syncs the
+ * client-side proxy entity's hurt/death state for rendering.
  */
 @Mixin(value = ClientDragonRenderer.class, remap = false)
 public abstract class ClientDragonRendererMixin {
 
-    // True when the world render will NOT have prepared the dragon this frame: the local player
-    // is gliding in first person with first-person-flight rendering disabled (DS skips the body).
     @Unique
     private static boolean ayamedscompat$worldDidNotPrepareDragon(final Player player) {
         return player == Minecraft.getInstance().player
@@ -70,8 +55,8 @@ public abstract class ClientDragonRendererMixin {
                 && !ClientDragonRenderer.renderFirstPersonFlight;
     }
 
-    // New DS (2.0.68+): prepareDragonRenderState bundles setDragonMovementData + handleFlightMovement.
-    // Skip the whole step in third-person compat; let it run in first-person glide.
+    // DS 2.0.68+ prepares the dragon in prepareDragonRenderState; avoid the duplicate pass in compat
+    // unless the world skipped it for first-person gliding.
     @Inject(method = "prepareDragonRenderState", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
     private static void ayamedscompat$skipPrepareInThirdPerson(final Player player, final DragonEntity dragon,
                                                                final float partialTick, final CallbackInfo ci) {
@@ -80,8 +65,7 @@ public abstract class ClientDragonRendererMixin {
         }
     }
 
-    // Old DS: setDragonMovementData is called directly in renderDragon. Wrapped with require=0 so the
-    // injection is absent (and harmless) under the new DS, where the call moved to prepareDragonRenderState.
+    // Older DS versions call these directly from renderDragon; require = 0 keeps the wraps inert there.
     @WrapOperation(method = "renderDragon", require = 0,
             at = @At(value = "INVOKE",
                     target = "Lby/dragonsurvivalteam/dragonsurvival/client/render/ClientDragonRenderer;"
@@ -96,7 +80,7 @@ public abstract class ClientDragonRendererMixin {
         }
     }
 
-    // Old DS: handleFlightMovement is called directly in renderDragon. Same require=0 note as above.
+    // Older DS versions call this directly from renderDragon; inert when the method is absent.
     @WrapOperation(method = "renderDragon", require = 0,
             at = @At(value = "INVOKE",
                     target = "Lby/dragonsurvivalteam/dragonsurvival/client/render/ClientDragonRenderer;"
@@ -124,5 +108,45 @@ public abstract class ClientDragonRendererMixin {
             return false;
         }
         return original.call(player);
+    }
+
+    // DS renders a client-side DragonEntity proxy, so the player's hurtTime never reaches the
+    // model and GeckoLib's hurt overlay stays off. Sync it for the duration of the render.
+    @Unique
+    private static DragonEntity ayamedscompat$syncedDragon;
+    @Unique
+    private static int ayamedscompat$savedHurtTime;
+    @Unique
+    private static int ayamedscompat$savedDeathTime;
+
+    @Inject(method = "renderDragon", at = @At("HEAD"), remap = false)
+    private static void ayamedscompat$syncHurtFlash(final RenderPlayerEvent.Pre event, final CallbackInfo ci) {
+        ayamedscompat$syncedDragon = null;
+        if (!(event.getEntity() instanceof Player player) || !DragonStateProvider.isDragon(player)) {
+            return;
+        }
+        DragonEntity dragon = ClientDragonRenderer.getOrCreateDragon(player);
+        if (dragon == null) {
+            return;
+        }
+        ayamedscompat$savedHurtTime = dragon.hurtTime;
+        ayamedscompat$savedDeathTime = dragon.deathTime;
+        if (AyamePaperDoll.CONFIGS.dragonHurtFlash.getValue()) {
+            dragon.hurtTime = player.hurtTime;
+        }
+        // Vanilla death tilt is applied from the rendered entity's deathTime; sync the proxy.
+        if (AyamePaperDoll.CONFIGS.dragonDeathAnimation.getValue()) {
+            dragon.deathTime = player.deathTime;
+        }
+        ayamedscompat$syncedDragon = dragon;
+    }
+
+    @Inject(method = "renderDragon", at = @At("RETURN"), remap = false)
+    private static void ayamedscompat$restoreHurtFlash(final RenderPlayerEvent.Pre event, final CallbackInfo ci) {
+        if (ayamedscompat$syncedDragon != null) {
+            ayamedscompat$syncedDragon.hurtTime = ayamedscompat$savedHurtTime;
+            ayamedscompat$syncedDragon.deathTime = ayamedscompat$savedDeathTime;
+            ayamedscompat$syncedDragon = null;
+        }
     }
 }
