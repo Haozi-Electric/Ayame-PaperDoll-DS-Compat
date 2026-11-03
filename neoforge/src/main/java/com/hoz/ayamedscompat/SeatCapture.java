@@ -24,6 +24,7 @@ package com.hoz.ayamedscompat;
 
 import com.geckolib.renderer.base.RenderPassInfo;
 import com.geckolib.util.RenderUtil;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 /**

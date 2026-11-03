@@ -6,6 +6,7 @@
   "client": [
     "CompatDisplayNeckMixin",
     "ClientDragonRendererAccessor",
+    "ClientDragonRendererMixin",
     "DragonRenderDataAccessor",
     "DragonRendererAccessor",
     "DragonRendererMixin"

@@ -27,6 +27,12 @@ pluginManagement {
     }
 }
 
+plugins {
+    // Required by gradle/gradle-daemon-jvm.properties so Gradle can locate/provision
+    // the Java 25 daemon that Minecraft 26.1.2 needs.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 rootProject.name = "Ayame-PaperDoll"
 
 include("common")

@@ -38,3 +38,19 @@ loom {
     accessWidenerPath = file("src/main/resources/${rootProject.property("mod_access_widener_name")}")
 }
 
+// NeoForge-only fork: the common module has no playable client. Loom registers default
+// client/server runs for every project; without a loader they try Fabric's KnotClient.
+// Disable them so the only usable client task is :neoforge:runClient.
+val currentProject = project
+gradle.projectsEvaluated {
+    val loomExtension = currentProject.extensions.getByType(net.fabricmc.loom.api.LoomGradleExtensionAPI::class.java)
+    loomExtension.runConfigs.removeIf { it.name == "client" || it.name == "server" }
+    listOf("runClient", "runServer").forEach { name ->
+        currentProject.tasks.findByName(name)?.apply {
+            enabled = false
+            group = null
+            description = "Unavailable in the common module - use :neoforge:runClient"
+        }
+    }
+}
+

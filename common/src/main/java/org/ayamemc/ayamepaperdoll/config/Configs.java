@@ -55,7 +55,7 @@ public class Configs {
     public final SimpleNumericOption<Double> headYawRange = new SimpleNumericOption<>(ROTATIONS_CATEGORY, AyamePaperDoll.path("head_yaw_range"), 0D, 0D, 180D);
     public final SimpleNumericOption<Double> bodyYaw = new SimpleNumericOption<>(ROTATIONS_CATEGORY, AyamePaperDoll.path("body_yaw"), 0D, -180D, 180D);
     public final SimpleNumericOption<Double> bodyYawRange = new SimpleNumericOption<>(ROTATIONS_CATEGORY, AyamePaperDoll.path("body_yaw_range"), 0D, 0D, 180D);
-    public final SimpleOption<PoseOffsetMethod> poseOffsetMethod = new SimpleOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("pose_offset_method"), PoseOffsetMethod.DISABLED);
+    public final SimpleOption<PoseOffsetMethod> poseOffsetMethod = new SimpleOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("pose_offset_method"), PoseOffsetMethod.AUTO);
     public final SimpleNumericOption<Double> sneakOffsetY = new SimpleNumericOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("sneak_offset_y"), -0.35, -3D, 3D);
     public final SimpleNumericOption<Double> swimCrawlOffsetY = new SimpleNumericOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("swim_crawl_offset_y"), -1.22, -3D, 3D);
     public final SimpleNumericOption<Double> elytraOffsetY = new SimpleNumericOption<>(POSTURES_CATEGORY, AyamePaperDoll.path("elytra_offset_y"), -1.22, -3D, 3D);
@@ -74,7 +74,9 @@ public class Configs {
     public final SimpleOption<Boolean> spectatorAutoSwitch = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("spectator_auto_switch"), true);
     public final SimpleOption<String> playerName = new SimpleOption<>(DETAILS_CATEGORY, AyamePaperDoll.path("player_name"), "");
     public final SimpleOption<Boolean> autoScaleDragonToHumanHeight = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_scale_dragon_to_human_height"), true);
-    public final SimpleOption<Boolean> autoFitRidingChain = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_fit_riding_chain"), false);
+    public final SimpleOption<Boolean> autoFitRidingChain = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("auto_fit_riding_chain"), true);
+    public final SimpleOption<Boolean> dragonHurtFlash = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("dragon_hurt_flash"), true);
+    public final SimpleOption<Boolean> dragonDeathAnimation = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("dragon_death_animation"), true);
     public final SimpleOption<Boolean> dsGlideWobble = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("ds_glide_wobble"), false);
     public final SimpleOption<Boolean> syncPassengerBodyYaw = new SimpleOption<>(DS_COMPAT_CATEGORY, AyamePaperDoll.path("sync_passenger_body_yaw"), true);
     public final SimpleOption<Integer> lastConfigTabIdx = new SimpleOption<>(HIDDEN_CATEGORY, AyamePaperDoll.path("last_config_tab_idx"), 0);

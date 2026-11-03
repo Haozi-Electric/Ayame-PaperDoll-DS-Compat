@@ -23,7 +23,7 @@
 package com.hoz.ayamedscompat.mixin;
 
 import by.dragonsurvivalteam.dragonsurvival.compat.Compat;
-import com.hoz.ayamedscompat.AyameDSCompat;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

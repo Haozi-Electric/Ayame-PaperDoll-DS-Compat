@@ -78,7 +78,8 @@ dependencies {
     common(project(path = ":common")) { isTransitive = false }
 
     implementation(fileTree(dsModsDir) { include("**/*DragonSurvival*.jar") })
-    compileOnly(fileTree(dsModsDir) { include("**/*geckolib*.jar") })
+    // DragonSurvival requires GeckoLib at runtime; the paper doll needs it for extraction.
+    implementation(fileTree(dsModsDir) { include("**/*geckolib*.jar") })
 
     shadowBundle(
         project(

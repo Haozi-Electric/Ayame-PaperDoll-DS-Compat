@@ -40,7 +40,7 @@ import net.minecraft.client.renderer.Projection;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import com.hoz.ayamedscompat.AyameDSCompat;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import org.ayamemc.ayamepaperdoll.hud.ModRenderState.ChainChild;

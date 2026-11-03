@@ -22,16 +22,20 @@
 
 package com.hoz.ayamedscompat.mixin;
 
+import by.dragonsurvivalteam.dragonsurvival.client.render.ClientDragonRenderer;
 import by.dragonsurvivalteam.dragonsurvival.client.render.entity.dragon.DragonRenderer;
 import by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvider;
+import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
 import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
 import com.geckolib.renderer.base.RenderPassInfo;
-import com.hoz.ayamedscompat.AyameDSCompat;
+import com.hoz.ayamedscompat.DragonAnimationSampler;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
 import com.hoz.ayamedscompat.BoneCacheGuard;
 import com.hoz.ayamedscompat.SeatCapture;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -79,7 +83,7 @@ public abstract class DragonRendererMixin {
             return;
         }
 
-        double yaw = MovementData.getData(root).bodyYaw;
+        double yaw = ayamedscompat$rootBodyYaw(root);
         float angle = -(float) yaw * ((float) Math.PI / 180.0F);
         float scale = (float) renderData.visualScale() * renderData.bodyScaleMultiplier();
         cir.setReturnValue(new Vec3(Math.sin(angle) * scale, 0, Math.cos(angle) * scale));
@@ -112,7 +116,7 @@ public abstract class DragonRendererMixin {
         ayamedscompat$savedBodyYaw = accessor.ds$getBodyYaw();
         // The root model and the MountingBone seat are rendered with the CURRENT body yaw;
         // using bodyYawLastFrame would lag the passenger one tick and rotate its tilt axes.
-        double syncedYaw = MovementData.getData(root).bodyYaw;
+        double syncedYaw = ayamedscompat$rootBodyYaw(root);
         accessor.ds$setBodyYaw(syncedYaw);
         ayamedscompat$bodyYawSynced = true;
     }
@@ -138,6 +142,19 @@ public abstract class DragonRendererMixin {
             root = parent;
         }
         return root;
+    }
+
+    @Unique
+    private static double ayamedscompat$rootBodyYaw(final Player root) {
+        final DragonEntity rootDragon = ClientDragonRenderer.getDragon(root);
+        if (rootDragon != null) {
+            final Double sampled = DragonAnimationSampler.sampleBodyYaw(rootDragon,
+                    Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false));
+            if (sampled != null) {
+                return sampled;
+            }
+        }
+        return MovementData.getData(root).bodyYaw;
     }
 
     // The paper doll places riders with the captured MountingBone transform; suppress DS's

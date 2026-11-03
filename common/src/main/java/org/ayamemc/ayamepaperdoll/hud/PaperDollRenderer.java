@@ -41,7 +41,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.phys.Vec3;
-import com.hoz.ayamedscompat.AyameDSCompat;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
 import org.ayamemc.ayamepaperdoll.hud.DataBackup.DataBackupEntry;
@@ -180,12 +180,19 @@ public class PaperDollRenderer {
 
         var targetRenderState = extractRenderState(targetEntity, a);
 
+        float singleFit = 1.0f;
+        if (poseOffsetMethod == Configs.PoseOffsetMethod.AUTO && AyameDSCompat.isDragon(targetEntity)) {
+            singleFit = getSingleDragonFitScale(targetEntity);
+        }
         extractPaperdoll(
                 graphics,
                 targetRenderState,
                 new Vector3f(0, (float) getPoseOffsetY(targetEntity, a, poseOffsetMethod), 0),
                 vehicleRenderState,
-                vehicleOffset
+                vehicleOffset,
+                null,
+                1.0f,
+                singleFit
         );
 
         if (vehicleBackup != null) vehicleBackup.restore();
@@ -382,18 +389,44 @@ public class PaperDollRenderer {
             return 1.0f;
         }
 
-        float rootHeight = Math.max(1.0f, root.getDimensions(root.getPose()).height() * groupScale);
-        float chainHeight = rootHeight + (chain.size() - 1) * Math.max(1.0f, rootHeight * 0.7f);
+        // The whole estimate is proportional to the human-height normalization; the floors
+        // must scale with groupScale too, otherwise a normalized chain is over-shrunk.
+        float rootHeight = Math.max(groupScale, root.getDimensions(root.getPose()).height() * groupScale);
+        float chainHeight = rootHeight + (chain.size() - 1) * Math.max(groupScale, rootHeight * 0.7f);
         double size = CONFIGS.size.getValue();
-        double anchor = CONFIGS.offsetY.getValue();
-        // The doll grows upward from the anchor. Presets with the anchor below the screen can use
-        // almost the whole screen height; top-corner presets only have the space above the anchor.
-        float available = anchor >= 1.0 ? 0.95f : (float) Math.max(0.06, Math.min(0.95, anchor - 0.05));
+        float available = (float) Math.max(0.06, CONFIGS.offsetY.getValue() - 0.05);
         float needed = (float) (chainHeight * size);
         if (needed <= available) {
             return 1.0f;
         }
         return Math.max(0.15f, available / needed);
+    }
+
+    /** Scale-only AUTO adaptation for a single dragon; the model never moves. */
+    private static float getSingleDragonFitScale(LivingEntity dragon) {
+        return computeFitScale(getExpectedModelHeight(dragon));
+    }
+
+    private static float computeFitScale(float modelHeight) {
+        final double size = CONFIGS.size.getValue();
+        final float available = (float) Math.max(0.06, CONFIGS.offsetY.getValue() - 0.05);
+        final float needed = (float) (modelHeight * size);
+        if (needed <= available) {
+            return 1.0f;
+        }
+        return Math.max(0.15f, available / needed);
+    }
+
+    private static float getExpectedModelHeight(LivingEntity entity) {
+        final boolean dragon = AyameDSCompat.isDragon(entity);
+        if (dragon && CONFIGS.autoScaleDragonToHumanHeight.getValue()) {
+            final float standing = entity.getDimensions(Pose.STANDING).height();
+            final float current = entity.getDimensions(entity.getPose()).height();
+            final float ratio = standing > 1.0E-4f ? current / standing : 1.0f;
+            return 1.8f * Mth.clamp(ratio, 0.25f, 2.5f);
+        }
+        final float height = Math.max(1.0f, entity.getDimensions(entity.getPose()).height());
+        return dragon ? height * 0.5f : height;
     }
 
     private double getPoseOffsetY(LivingEntity targetEntity, float partialTicks, Configs.PoseOffsetMethod poseOffsetMethod) {
@@ -549,7 +582,7 @@ public class PaperDollRenderer {
                         offset2,
                         pose,
                         new Quaternionf(configRot).conjugate(),
-                        (int) posX, (int) posY,(float) size, null
+                        (int) posX, (int) posY, (float) (size * fitScale), null
                 )
         );
     }
@@ -567,7 +600,7 @@ public class PaperDollRenderer {
         if (targetEntity instanceof LivingEntity livingEntity) {
             EntityRenderState dragonState = AyameDSCompat.createDragonUIRenderState(
                     livingEntity, a,
-                    livingEntity.yBodyRot, 0.0, livingEntity.getXRot(),
+                    Mth.rotLerp(a, livingEntity.yBodyRotO, livingEntity.yBodyRot), 0.0, livingEntity.getXRot(),
                     autoScaleDragon, chainChild);
             if (dragonState != null) {
                 // DS compat active only for dragon players; gate it so normal human models
