@@ -22,12 +22,14 @@
 
 package com.hoz.ayamedscompat.mixin;
 
+import by.dragonsurvivalteam.dragonsurvival.client.render.ClientDragonRenderer;
 import by.dragonsurvivalteam.dragonsurvival.client.render.entity.dragon.DragonRenderer;
 import by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvider;
 import by.dragonsurvivalteam.dragonsurvival.common.entity.DragonEntity;
 import by.dragonsurvivalteam.dragonsurvival.registry.attachments.MovementData;
 import by.dragonsurvivalteam.dragonsurvival.server.handlers.ServerFlightHandler;
-import com.hoz.ayamedscompat.AyameDSCompat;
+import com.hoz.ayamedscompat.DragonAnimationSampler;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -35,6 +37,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
@@ -53,8 +56,6 @@ public abstract class DragonRendererMixin {
     @Unique
     private double ayamedscompat$savedBodyYaw;
     @Unique
-    private double ayamedscompat$savedBodyYawLastFrame;
-    @Unique
     private float ayamedscompat$savedPrevXRot;
     @Unique
     private float ayamedscompat$savedPrevZRot;
@@ -62,6 +63,10 @@ public abstract class DragonRendererMixin {
     private boolean ayamedscompat$needsRestore;
     @Unique
     private boolean ayamedscompat$savedFlightRotations;
+    @Unique
+    private boolean ayamedscompat$setupSavedInInventory;
+    @Unique
+    private boolean ayamedscompat$setupForcedInventory;
     @Unique
     private boolean ayamedscompat$savedInInventory;
     @Unique
@@ -76,6 +81,16 @@ public abstract class DragonRendererMixin {
         }
     }
 
+    // DS 2.0.72 moved the shared BONE_ROTATIONS write from postRender into the render pass
+    // (renderCubesOfBone). Skip it during compat so HUD poses do not replace the world's
+    // MountingBone rotations. Older DS has no such method; require = 0 keeps this inert there.
+    @Inject(method = "updateBoneRotation", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
+    private static void ayamedscompat$skipBoneRotationCache(final CallbackInfo ci) {
+        if (AyameDSCompat.isRenderingForCompat()) {
+            ci.cancel();
+        }
+    }
+
     // World: align a dragon passenger's body to the root mount (DS only does this on the
     // passenger's own client). Paper doll: face the doll's locked pose. Restored at RETURN so
     // the animation still sees the real world values.
@@ -87,53 +102,89 @@ public abstract class DragonRendererMixin {
             return;
         }
         if (!AyameDSCompat.isRenderingForCompat()) {
-            if (AyamePaperDoll.CONFIGS.syncPassengerBodyYaw.getValue()) {
-                ayamedscompat$syncPassengerBodyYaw(player);
+            if (AyamePaperDoll.CONFIGS.syncPassengerBodyYaw.getValue()
+                    && ayamedscompat$syncPassengerBodyYaw(player, partialTick)) {
+                ayamedscompat$useSampledFlightTilt(dragon, partialTick);
+                ayamedscompat$forceLegacySetupRender(dragon);
             }
             return;
         }
         final MovementData movement = MovementData.getData(player);
         ayamedscompat$savedBodyYaw = movement.bodyYaw;
-        ayamedscompat$savedBodyYawLastFrame = movement.bodyYawLastFrame;
-        movement.bodyYaw = player.yBodyRot;
-        // Newer DS wings the glide condition off dragon.prevXRot/prevZRot as well. When the
-        // wobble is disabled, zero them so the release condition (isGliding forced false below
-        // AND prevXRot/prevZRot == 0) keeps the body level; restore them at RETURN.
+        // Interpolate the locked body yaw; using the raw tick value makes the doll visibly
+        // step while turning. The world dragon gets the same smoothing from
+        // animationState.sample(partialTick).
+        movement.bodyYaw = Mth.rotLerp(partialTick, player.yBodyRotO, player.yBodyRot);
         if (!AyamePaperDoll.CONFIGS.dsGlideWobble.getValue()) {
-            ayamedscompat$savedPrevXRot = dragon.prevXRot;
-            ayamedscompat$savedPrevZRot = dragon.prevZRot;
-            dragon.prevXRot = 0;
-            dragon.prevZRot = 0;
-            ayamedscompat$savedFlightRotations = true;
+            // Newer DS wings the glide condition off dragon.prevXRot/prevZRot as well. Zero
+            // them so the release condition (isGliding forced false below AND prev == 0)
+            // keeps the body level.
+            ayamedscompat$setFlightTilt(dragon, 0.0F, 0.0F);
+        } else {
+            // DS updates prevXRot/prevZRot once per tick; reusing the raw values makes the
+            // paper doll wobble at 20 Hz. Feed it the partial-tick-interpolated values the
+            // world renderer samples instead.
+            ayamedscompat$useSampledFlightTilt(dragon, partialTick);
         }
+        ayamedscompat$forceLegacySetupRender(dragon);
         ayamedscompat$needsRestore = true;
+    }
+
+    // DS 2.0.72 samples dragon.animationState in setupRender unless the proxy is marked as
+    // an inventory render. Force the MovementData/prevXRot path for this method only, so the
+    // body-yaw pin and glide zeroing still apply; RETURN restores the flag before the model's
+    // molang queries run, so tail/body motion animations stay live.
+    @Unique
+    private void ayamedscompat$forceLegacySetupRender(final DragonEntity dragon) {
+        ayamedscompat$setupSavedInInventory = dragon.isInInventory;
+        dragon.isInInventory = true;
+        ayamedscompat$setupForcedInventory = true;
+    }
+
+    @Unique
+    private void ayamedscompat$setFlightTilt(final DragonEntity dragon, final float pitch, final float roll) {
+        ayamedscompat$savedPrevXRot = dragon.prevXRot;
+        ayamedscompat$savedPrevZRot = dragon.prevZRot;
+        dragon.prevXRot = pitch;
+        dragon.prevZRot = roll;
+        ayamedscompat$savedFlightRotations = true;
+    }
+
+    @Unique
+    private void ayamedscompat$useSampledFlightTilt(final DragonEntity dragon, final float partialTick) {
+        final float[] flight = DragonAnimationSampler.sampleFlight(dragon, partialTick);
+        if (flight != null) {
+            ayamedscompat$setFlightTilt(dragon, flight[0], flight[1]);
+        }
     }
 
     @Inject(method = "setupRender", at = @At("RETURN"), remap = false)
     private void ayamedscompat$restoreBodyYaw(final DragonEntity dragon, final Player player,
                                               final PoseStack pose, final float partialTick,
                                               final CallbackInfo ci) {
-        if (!ayamedscompat$needsRestore || player == null) {
-            return;
+        if (ayamedscompat$needsRestore && player != null) {
+            final MovementData movement = MovementData.getData(player);
+            movement.bodyYaw = ayamedscompat$savedBodyYaw;
+            if (ayamedscompat$savedFlightRotations) {
+                dragon.prevXRot = ayamedscompat$savedPrevXRot;
+                dragon.prevZRot = ayamedscompat$savedPrevZRot;
+                ayamedscompat$savedFlightRotations = false;
+            }
+            ayamedscompat$needsRestore = false;
         }
-        final MovementData movement = MovementData.getData(player);
-        movement.bodyYaw = ayamedscompat$savedBodyYaw;
-        movement.bodyYawLastFrame = ayamedscompat$savedBodyYawLastFrame;
-        if (ayamedscompat$savedFlightRotations) {
-            dragon.prevXRot = ayamedscompat$savedPrevXRot;
-            dragon.prevZRot = ayamedscompat$savedPrevZRot;
-            ayamedscompat$savedFlightRotations = false;
+        if (ayamedscompat$setupForcedInventory) {
+            dragon.isInInventory = ayamedscompat$setupSavedInInventory;
+            ayamedscompat$setupForcedInventory = false;
         }
-        ayamedscompat$needsRestore = false;
     }
 
     @Unique
-    private void ayamedscompat$syncPassengerBodyYaw(final Player player) {
+    private boolean ayamedscompat$syncPassengerBodyYaw(final Player player, final float partialTick) {
         if (ayamedscompat$needsRestore || !player.isPassenger()) {
-            return;
+            return false;
         }
         if (!(player.getVehicle() instanceof Player vehicle) || !DragonStateProvider.isDragon(vehicle)) {
-            return;
+            return false;
         }
         // Intermediate alignment is temporary; a deeper passenger must use the root's bodyYaw.
         Player root = vehicle;
@@ -141,13 +192,17 @@ public abstract class DragonRendererMixin {
             root = parent;
         }
         final MovementData movement = MovementData.getData(player);
-        final MovementData rootMovement = MovementData.getData(root);
+        // Match the root's rendered body yaw: use its partial-tick-interpolated sample when
+        // the running DS exposes it, otherwise fall back to the current tick value.
+        final DragonEntity rootDragon = ClientDragonRenderer.getDragon(root);
+        final Double sampled = rootDragon == null
+                ? null
+                : DragonAnimationSampler.sampleBodyYaw(rootDragon, partialTick);
+        final double yaw = sampled != null ? sampled : MovementData.getData(root).bodyYaw;
         ayamedscompat$savedBodyYaw = movement.bodyYaw;
-        ayamedscompat$savedBodyYawLastFrame = movement.bodyYawLastFrame;
-        final double yaw = rootMovement.bodyYawLastFrame;
         movement.bodyYaw = yaw;
-        movement.bodyYawLastFrame = yaw;
         ayamedscompat$needsRestore = true;
+        return true;
     }
 
     // Paper-doll bone poses live in HUD space. Skip DS's shared bone-cache write during compat

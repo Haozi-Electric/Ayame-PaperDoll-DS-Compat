@@ -110,7 +110,7 @@
   "config.ayame_paperdoll.option.dragon_hurt_flash": "龙受伤红色闪烁",
   "config.ayame_paperdoll.option.dragon_hurt_flash.desc": "使龙受伤时显示原版受伤红色闪烁。盔甲与发光层不受影响。",
   "config.ayame_paperdoll.option.dragon_death_animation": "龙死亡动画",
-  "config.ayame_paperdoll.option.dragon_death_animation.desc": "使龙死亡时显示原版死亡倾倒动画。盔甲与发光层不受影响。",
+  "config.ayame_paperdoll.option.dragon_death_animation.desc": "使龙死亡时显示原版死亡倾倒动画。",
   "config.ayame_paperdoll.option.ds_glide_wobble": "滑翔摆动",
   "config.ayame_paperdoll.option.ds_glide_wobble.desc": "滑翔时纸娃娃龙会像世界中的龙一样俯冲低头并向侧面倾斜摆动。仅影响纸娃娃渲染。",
   "config.ayame_paperdoll.option.sync_passenger_body_yaw": "同步乘客身体朝向",

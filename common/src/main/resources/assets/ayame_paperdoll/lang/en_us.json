@@ -110,7 +110,7 @@
   "config.ayame_paperdoll.option.dragon_hurt_flash": "Dragon Hurt Flash",
   "config.ayame_paperdoll.option.dragon_hurt_flash.desc": "Shows the vanilla red hurt overlay on dragon bodies in the world and the paper doll. Armor and glow layers are unaffected.",
   "config.ayame_paperdoll.option.dragon_death_animation": "Dragon Death Animation",
-  "config.ayame_paperdoll.option.dragon_death_animation.desc": "Restores the vanilla death tilt for dragon models in the world and the paper doll. Armor and glow layers are unaffected.",
+  "config.ayame_paperdoll.option.dragon_death_animation.desc": "Restores the vanilla death tilt for dragon models in the world and the paper doll.",
   "config.ayame_paperdoll.option.ds_glide_wobble": "Glide Wobble",
   "config.ayame_paperdoll.option.ds_glide_wobble.desc": "Lets the paper doll dragon pitch down and bank side to side while gliding, just like the dragon in the world. Only affects the paper doll rendering.",
   "config.ayame_paperdoll.option.sync_passenger_body_yaw": "Sync Passenger Body Yaw",

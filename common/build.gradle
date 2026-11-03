@@ -37,3 +37,17 @@ dependencies {
 loom {
     accessWidenerPath = file("${mod_access_widener_path}")
 }
+
+// NeoForge-only fork: the common module has no playable client. Loom registers default
+// client/server runs for every project; without a loader they try Fabric's KnotClient and
+// fail. Remove them so the only usable client task is :neoforge:runClient.
+gradle.projectsEvaluated {
+    loom.runs.removeIf { it.name == 'client' || it.name == 'server' }
+    ['runClient', 'runServer'].each { name ->
+        tasks.findByName(name)?.with {
+            enabled = false
+            group = null
+            description = 'Unavailable in the common module - use :neoforge:runClient'
+        }
+    }
+}

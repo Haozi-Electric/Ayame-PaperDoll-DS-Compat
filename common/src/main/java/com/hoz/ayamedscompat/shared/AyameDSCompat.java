@@ -20,7 +20,7 @@
  *     along with Ayame PaperDoll.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.hoz.ayamedscompat;
+package com.hoz.ayamedscompat.shared;
 
 import net.minecraft.world.entity.Entity;
 import org.joml.Matrix4f;

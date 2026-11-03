@@ -44,8 +44,8 @@ import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.phys.Vec3;
-import com.hoz.ayamedscompat.AyameDSCompat;
-import com.hoz.ayamedscompat.AyameDSCompat.SeatTransform;
+import com.hoz.ayamedscompat.shared.AyameDSCompat;
+import com.hoz.ayamedscompat.shared.AyameDSCompat.SeatTransform;
 import org.ayamemc.ayamepaperdoll.AyamePaperDoll;
 import org.ayamemc.ayamepaperdoll.config.Configs;
 import org.ayamemc.ayamepaperdoll.config.Configs.RotationMode;
@@ -300,7 +300,15 @@ public class PaperDollRenderer {
                 groupScale = AyameDSCompat.getDragonScaleFactor(root);
             }
 
-            float fitScale = getChainFitScale(chain, root);
+            // The chain height estimate must use the same human-height normalization that is
+            // applied to the poseStack below. Otherwise enabling auto-scale makes the actual
+            // chain smaller while the fit still assumes full human height, over-shrinking it
+            // and leaving a gap at the top of the window.
+            final float rootHeight = getScaledModelHeight(root, groupScale);
+            final float chainHeight = getExpectedChainHeight(chain.size(), rootHeight, groupScale);
+            final float fitScale = CONFIGS.autoFitRidingChain.getValue() && chain.size() > 1
+                    ? computeFitScale(chainHeight)
+                    : 1.0f;
 
             PoseStack poseStack = new PoseStack();
             poseStack.mulPose(Axis.YP.rotationDegrees(-CONFIGS.lightDegree.getValue().floatValue() - 180.0F));
@@ -319,8 +327,9 @@ public class PaperDollRenderer {
                     long now = System.nanoTime();
                     if (now - lastChainFitLogNanos > 1_000_000_000L) {
                         lastChainFitLogNanos = now;
-                        AyamePaperDoll.LOGGER.info("[Debug] auto-fit riding chain: nodes={}, fit={}",
-                                chain.size(), fitScale);
+                        AyamePaperDoll.LOGGER.info(
+                                "[Debug] auto-fit riding chain: nodes={}, fit={}, rootHeight={}, chainHeight={}, available={}",
+                                chain.size(), fitScale, rootHeight, chainHeight, computeAvailableHeight());
                     }
                 }
             }
@@ -386,25 +395,21 @@ public class PaperDollRenderer {
         }
     }
 
-    /** Scale-only fit for the riding chain; placement stays at the configured anchor. */
-    private static float getChainFitScale(List<LivingEntity> chain, LivingEntity root) {
-        if (!CONFIGS.autoFitRidingChain.getValue() || chain.size() <= 1) {
-            return 1.0f;
-        }
-        return computeFitScale(getExpectedChainHeight(chain.size(), root));
-    }
-
     /** Scale-only AUTO adaptation for a single dragon; the model never moves. */
     private static float getSingleDragonFitScale(LivingEntity dragon) {
-        return computeFitScale(getExpectedModelHeight(dragon));
+        final float groupScale = CONFIGS.autoScaleDragonToHumanHeight.getValue()
+                ? AyameDSCompat.getDragonScaleFactor(dragon)
+                : 1.0f;
+        return computeFitScale(getScaledModelHeight(dragon, groupScale));
+    }
+
+    private static float computeAvailableHeight() {
+        return (float) Math.max(0.06, CONFIGS.offsetY.getValue() - 0.05);
     }
 
     private static float computeFitScale(float modelHeight) {
         final double size = CONFIGS.size.getValue();
-        final double anchor = CONFIGS.offsetY.getValue();
-        // The doll grows upward from the anchor. Presets with the anchor below the screen can use
-        // almost the whole screen height; top-corner presets only have the space above the anchor.
-        final float available = anchor >= 1.0 ? 0.95f : (float) Math.max(0.06, Math.min(0.95, anchor - 0.05));
+        final float available = computeAvailableHeight();
         final float needed = (float) (modelHeight * size);
         if (needed <= available) {
             return 1.0f;
@@ -412,23 +417,22 @@ public class PaperDollRenderer {
         return Math.max(0.15f, available / needed);
     }
 
-    private static float getExpectedChainHeight(int nodes, LivingEntity root) {
-        final float rootHeight = getExpectedModelHeight(root);
-        return rootHeight + (nodes - 1) * Math.max(1.0f, rootHeight * 0.7f);
+    private static float getExpectedChainHeight(int nodes, float rootHeight, float groupScale) {
+        // The per-node floor must scale with the human-height normalization, otherwise a
+        // normalized (small) chain is estimated as if it were full-size and over-shrunk.
+        return rootHeight + (nodes - 1) * Math.max(groupScale, rootHeight * 0.7f);
     }
 
-    private static float getExpectedModelHeight(LivingEntity entity) {
-        final boolean dragon = AyameDSCompat.isDragon(entity);
-        if (dragon && CONFIGS.autoScaleDragonToHumanHeight.getValue()) {
-            // The DS hitbox is about twice the rendered model; the pose ratio cancels the
-            // constant factor and still follows pose changes.
-            final float standing = entity.getDimensions(Pose.STANDING).height();
-            final float current = entity.getDimensions(entity.getPose()).height();
-            final float ratio = standing > 1.0E-4f ? current / standing : 1.0f;
-            return 1.8f * Mth.clamp(ratio, 0.25f, 2.5f);
-        }
+    /** Rendered model height before the paper doll's human-height normalization. */
+    private static float getRawModelHeight(LivingEntity entity) {
         final float height = Math.max(1.0f, entity.getDimensions(entity.getPose()).height());
-        return dragon ? height * 0.5f : height;
+        // The DS hitbox is about twice the rendered model.
+        return AyameDSCompat.isDragon(entity) ? height * 0.5f : height;
+    }
+
+    /** Model height after the same groupScale that is applied to the paper doll poseStack. */
+    private static float getScaledModelHeight(LivingEntity entity, float groupScale) {
+        return Math.max(groupScale, getRawModelHeight(entity) * groupScale);
     }
 
     private Map<LivingEntity, List<LivingEntity>> buildRenderedChildren(List<LivingEntity> chain) {

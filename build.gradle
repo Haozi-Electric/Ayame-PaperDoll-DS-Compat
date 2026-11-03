@@ -56,6 +56,19 @@ subprojects {
         // See https://docs.gradle.org/current/userguide/declaring_repositories.html
         // for more information about repositories.
 
+        // Locally cached NeoForge userdev artifacts (see libs/neoforge-maven).
+        maven {
+            name = 'LocalNeoForge'
+            url = rootProject.uri('libs/neoforge-maven')
+        }
+
+        mavenCentral()
+
+        maven {
+            name = 'FabricMC'
+            url = 'https://maven.fabricmc.net/'
+        }
+
         // ParchmentMC Mapping
         maven {
             name = 'ParchmentMC'

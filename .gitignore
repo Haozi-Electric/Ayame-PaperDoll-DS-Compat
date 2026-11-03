@@ -13,4 +13,6 @@ build/*
 /remappedSrc/
 /.idea/
 !/.idea/copyright/
+# Dragon Survival jars are All Rights Reserved — local debugging only, never commit
+/libs/
 /*/.architectury-transformer/

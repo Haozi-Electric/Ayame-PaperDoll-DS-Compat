@@ -56,23 +56,44 @@ repositories {
     maven {
         url "https://cursemaven.com"
     }
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+    }
 }
+
+// Local mod jars for the dev client: put the DragonSurvival and GeckoLib jars for the
+// matching Minecraft version into libs/<mc_version>/. The newest DS jar is used at runtime;
+// compilation stays on the oldest supported DS API so the mod keeps working across versions.
+def localModsDir = rootProject.file("libs/${rootProject.minecraft_version}")
+def dsRuntimeJars = fileTree(dir: localModsDir, include: ['DragonSurvival-*.jar'])
+def geckolibJars = fileTree(dir: localModsDir, include: ['geckolib-*.jar'])
 
 dependencies {
     neoForge "net.neoforged:neoforge:$rootProject.neoforge_version"
 
-    implementation "curse.maven:dragons-survival-420799:8010249"
+    compileOnly "curse.maven:dragons-survival-420799:8010249"
 
-    // GeckoLib is not exposed transitively by DragonSurvival, but DragonEntity extends
-    // GeckoLib's GeoEntity, so calling dragon.getScale() in AyameDSCompatMod needs the
-    // GeckoLib classes at compile time. Resolve the locally cached jar (a proper maven
-    // coordinate can replace this when network is available).
-    def geckolibCache = fileTree(dir: "${System.getProperty('user.home')}/.gradle/caches/modules-2/files-2.1/software.bernie.geckolib/geckolib-neoforge-1.21.1/4.8.4",
-            include: ['*/geckolib-neoforge-1.21.1-4.8.4.jar'])
-    compileOnly geckolibCache
+    if (!dsRuntimeJars.isEmpty()) {
+        runtimeOnly files(dsRuntimeJars)
+    } else {
+        runtimeOnly "curse.maven:dragons-survival-420799:9398330"
+    }
+
+    // DragonSurvival requires GeckoLib at runtime, and DragonEntity extends GeoEntity so the
+    // compat hook also needs it at compile time.
+    if (!geckolibJars.isEmpty()) {
+        implementation files(geckolibJars)
+    } else {
+        implementation "software.bernie.geckolib:geckolib-neoforge-${rootProject.minecraft_version}:4.8.4"
+    }
 
     common(project(path: ':common', configuration: 'namedElements')) { transitive false }
     shadowBundle project(path: ':common', configuration: 'transformProductionNeoForge')
+}
+
+tasks.matching { it.name == 'runClient' }.configureEach {
+    description = "Runs the NeoForge client with Dragon Survival from ${localModsDir}"
 }
 
 processResources {
@@ -87,6 +108,7 @@ processResources {
             mod_mixin_config                : project.findProperty('mod_mixin_config'),
             mod_issues_url                  : project.findProperty('mod_issues_url'),
             neoforge_version                : project.findProperty('neoforge_version'),
+            neoforge_version_range          : project.findProperty('neoforge_version_range'),
             neoforge_minecraft_version_range: project.findProperty('neoforge_minecraft_version_range'),
 
             version                         : project.version

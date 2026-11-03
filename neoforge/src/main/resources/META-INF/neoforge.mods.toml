@@ -26,7 +26,7 @@ logoBlur = false
 [[dependencies.${ mod_id }]]
 modId = "neoforge"
 type = "required"
-versionRange = "[${neoforge_version},)"
+versionRange = "${neoforge_version_range}"
 ordering = "NONE"
 side = "CLIENT"
 
@@ -52,7 +52,7 @@ logoBlur = false
 [[dependencies.ayame_ds_compat]]
 modId = "neoforge"
 type = "required"
-versionRange = "[${neoforge_version},)"
+versionRange = "${neoforge_version_range}"
 ordering = "NONE"
 side = "CLIENT"
 
